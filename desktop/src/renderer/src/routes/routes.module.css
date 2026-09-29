@@ -157,3 +157,65 @@
   padding: 0 10px;
   font-size: 16px;
 }
+.section {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 640px;
+}
+.sectionTitle {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin: 0;
+}
+.name {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+}
+.muted {
+  color: var(--text-muted);
+  margin: 0;
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stepBtn {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: 0;
+  background: var(--border);
+  color: var(--text);
+  font-size: 26px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.value {
+  min-width: 64px;
+  text-align: center;
+  font-size: 18px;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.actions {
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+}
