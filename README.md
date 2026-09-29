@@ -1,13 +1,13 @@
 # SeñaVoz
 
-App móvil que traducirá señas comunes de reuniones a voz. **Este MVP** incluye: monorepo, autenticación completa (JWT con rotación de refresh tokens), catálogo de frases con reproducción de voz, y pantalla de cámara con permisos y un reconocedor de señas *simulado*. El reconocimiento real (MediaPipe + LSTM) queda para las fases 2–4 (ver [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
+App de escritorio (Windows) que traducirá a voz las señas más comunes en una reunión. **Este MVP** incluye el monorepo, la autenticación completa (JWT con rotación de refresh tokens), el catálogo de frases con reproducción de voz y una pantalla de cámara con un reconocedor de señas *simulado*. El reconocimiento real (MediaPipe + modelo propio) y la salida de voz hacia la reunión llegan en las fases 2–4 (ver [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
 
 ```
 senavoz/
-├── mobile/     # Expo SDK 57 + React Native + TypeScript (development build)
+├── desktop/    # Electron + React + TypeScript (electron-vite)
 ├── backend/    # FastAPI + SQLAlchemy 2 + Alembic + PostgreSQL
 ├── docker-compose.yml
-└── docs/ARCHITECTURE.md
+└── docs/       # ARCHITECTURE.md, specs y planes
 ```
 
 ## Requisitos
@@ -16,9 +16,9 @@ senavoz/
 |---|---|
 | Backend con Docker | Docker + Docker Compose |
 | Backend sin Docker / tests | Python 3.12+ (Docker usa 3.12; los tests también pasan en 3.14) |
-| Móvil | Node.js 20+ (probado con 24), npm |
-| Dev build Android | Android Studio (SDK + emulador) o dispositivo con depuración USB, JDK 17 |
-| Dev build iOS | **macOS** con Xcode (no es posible compilar iOS en Windows/Linux) |
+| App de escritorio | Node.js 20+ (probado con 24), npm, Windows 10/11 |
+| Voz | Una voz en español instalada en Windows (Configuración › Hora e idioma › Voz) |
+| Cámara | Una webcam |
 
 ## Backend
 
@@ -26,7 +26,7 @@ senavoz/
 docker compose up --build
 ```
 
-Levanta `db` (Postgres 17) y `api`; al arrancar, el contenedor ejecuta `alembic upgrade head` y el seed idempotente de frases. API en <http://localhost:8000> (docs interactivas en `/docs`).
+Levanta `db` (Postgres 17) y `api`. Al arrancar, el contenedor ejecuta `alembic upgrade head` y el seed idempotente de frases. La API queda en <http://localhost:8000>, con documentación interactiva en `/docs`.
 
 > Las credenciales de BD y el `JWT_SECRET` por defecto de `docker-compose.yml` son **solo para desarrollo**. Para cualquier otro entorno defínelos (`POSTGRES_PASSWORD`, `JWT_SECRET`) en un `.env` junto al compose. El secreto JWT debe tener ≥ 32 caracteres.
 
@@ -54,7 +54,7 @@ uvicorn app.main:app --reload
 | GET | `/phrases` | Bearer | Catálogo de frases |
 | GET | `/health` | – | Liveness |
 
-Access token: 15 min. Refresh token: 7 días, `secrets.token_urlsafe`, guardado como SHA-256. Rate limiting en login (5/min), register (10/min) y refresh (30/min) por IP.
+Access token: 15 min. Refresh token: 7 días, `secrets.token_urlsafe`, guardado como SHA-256. Rate limiting por IP en login (5/min), register (10/min) y refresh (30/min).
 
 ### Variables de entorno (`backend/.env.example`)
 
@@ -63,41 +63,36 @@ Access token: 15 min. Refresh token: 7 días, `secrets.token_urlsafe`, guardado 
 | `DATABASE_URL` | URL SQLAlchemy (`postgresql+psycopg://...`) |
 | `JWT_SECRET` | Secreto de firma, ≥ 32 caracteres. **Solo por entorno** |
 | `ACCESS_TOKEN_MINUTES` / `REFRESH_TOKEN_DAYS` | Vigencias (15 / 7) |
-| `CORS_ORIGINS` | Orígenes permitidos separados por comas |
+| `CORS_ORIGINS` | Orígenes permitidos separados por comas. Para la app: `http://localhost:5173,app://senavoz` |
 | `RATE_LIMIT_LOGIN` / `_REGISTER` / `_REFRESH` | Formato slowapi, p. ej. `5/minute` |
 
-Nota: el límite de peticiones usa memoria del proceso; con varios workers/réplicas habría que moverlo a Redis.
+Nota: el límite de peticiones usa la memoria del proceso. Con varios workers o réplicas habría que moverlo a Redis.
 
-## Móvil (development build, no Expo Go)
-
-`expo-camera`, `expo-secure-store` y `expo-audio` incluyen código nativo, por eso se usa un *development build*.
+## App de escritorio
 
 ```bash
-cd mobile
+cd desktop
 npm install
-cp .env.example .env     # ajusta EXPO_PUBLIC_API_URL (ver abajo)
-
-npx expo run:android     # compila e instala el dev build (emulador o dispositivo USB)
-npx expo run:ios         # solo en macOS con Xcode
-
-npm start                # servidor Metro para el dev build ya instalado (expo start --dev-client)
+cp .env.example .env        # RENDERER_VITE_API_URL (por defecto http://localhost:8000)
+npm run dev                 # app en modo desarrollo con recarga en caliente
+npm run build:win           # instalador en desktop/release/SenaVoz-Setup-<versión>.exe
 ```
 
-También puedes compilar en la nube con EAS (requiere cuenta de Expo): `npx eas build:configure` y luego `npx eas build --profile development --platform android|ios` tras añadir `"developmentClient": true` al perfil `development` de `eas.json` (no incluido en este repo).
-
-**`EXPO_PUBLIC_API_URL`** debe ser alcanzable desde el dispositivo:
-- Emulador Android: `http://10.0.2.2:8000` (valor por defecto en Android)
-- Simulador iOS: `http://localhost:8000` (valor por defecto en iOS)
-- Dispositivo físico: `http://<IP-LAN-de-tu-PC>:8000` (mismo Wi‑Fi; permite el puerto 8000 en el firewall)
-
-Las builds Android permiten tráfico HTTP en claro (`usesCleartextTraffic`, vía `expo-build-properties`) para desarrollo local. **Debe desactivarse y usarse HTTPS en producción.**
+**`RENDERER_VITE_API_URL` se fija al compilar**, porque también se escribe en la CSP de `index.html`. Si la cambias, hay que recompilar. Debe ser alcanzable desde el PC (normalmente `http://localhost:8000`).
 
 ### Uso
 
-1. Regístrate (te deja dentro) o inicia sesión.
-2. **Frases**: toca una tarjeta y se reproduce en voz.
-3. **Cámara**: concede el permiso; verás la cámara frontal con el texto "Reconocimiento de señas: próximamente". El botón de *Depuración* dispara una seña simulada (recorre las frases) y la reproduce en voz.
-4. **Ajustes**: perfil, volumen y velocidad de voz (persisten en el dispositivo) y **Cerrar sesión** (revoca el refresh token en el servidor).
+1. Regístrate (entras directamente) o inicia sesión. La sesión se mantiene al cerrar y reabrir la app.
+2. **Frases**: haz clic en una tarjeta (o pulsa Enter/Espacio) y se reproduce en voz. **Atajos 1–9** para las nueve primeras frases; no se disparan mientras escribes ni con Ctrl/Alt.
+3. **Cámara**: vista de la webcam en espejo y el aviso "Reconocimiento de señas: próximamente". El panel de *Depuración* dispara una seña simulada (recorre las frases) y la reproduce en voz. Si hay varias webcams aparece un selector. Si la cámara falta, está bloqueada por Windows o la usa otra app (Zoom, Teams…), se muestra un mensaje específico con "Reintentar".
+4. **Ajustes**: perfil, voz del sistema (voces `es-*` instaladas), volumen, velocidad, cámara preferida (si se desenchufa, se usa la predeterminada) y **Cerrar sesión**, que revoca el refresh token en el servidor.
+
+### Seguridad
+
+- Los tokens solo se guardan **cifrados con `safeStorage` (DPAPI de Windows)** en `%APPDATA%\SeñaVoz\session.bin`, desde el proceso main. Si el cifrado no está disponible, la sesión no se guarda (nunca en claro). Las preferencias no sensibles van a `localStorage`.
+- `contextIsolation` + `sandbox` activados y `nodeIntegration` desactivado. El preload solo expone `window.senavoz.tokens.{get, save, clear}`.
+- La UI se sirve desde el protocolo propio `app://senavoz`, que solo entrega archivos de la carpeta de la UI. La CSP limita `connect-src` a la API.
+- Solo se concede el permiso de cámara a la propia app. La navegación externa y `window.open` están bloqueados.
 
 ## Tests
 
@@ -105,32 +100,41 @@ Las builds Android permiten tráfico HTTP en claro (`usesCleartextTraffic`, vía
 # Backend (SQLite en memoria; no requiere Postgres)
 cd backend && pytest
 
-# Móvil
-cd mobile
-npm test              # Jest + React Native Testing Library
-npm run typecheck     # tsc --noEmit
+# Escritorio
+cd desktop
+npm test              # Vitest: proyectos main (node) y renderer (jsdom + Testing Library)
+npm run typecheck     # tsc para main/preload y renderer
 ```
 
-Backend (19 tests): registro, email duplicado, contraseñas débiles, login correcto/incorrecto (respuestas indistinguibles), rate limit, `/users/me` con y sin token, refresh con rotación, detección de reutilización, refresh expirado, logout, frases y seed idempotente.
-Móvil (13 tests): pantalla de login (validación, normalización, errores), store de sesión (login, restore, logout que revoca) y cliente HTTP (un único refresh ante 401 concurrentes; cierre de sesión si el refresh falla).
+- **Backend (22 tests):** registro, email duplicado, contraseñas débiles, login correcto e incorrecto (respuestas indistinguibles), rate limit, `/users/me` con y sin token, refresh con rotación, detección de reutilización, refresh expirado, logout, frases, seed idempotente y CORS de los orígenes de escritorio.
+- **Escritorio, main (20 tests):** almacén de tokens cifrado (incluidos archivo corrupto y cifrado no disponible), resolución de rutas de `app://` (path traversal, también codificado), orígenes y permisos de confianza, y User-Agent ASCII.
+- **Escritorio, renderer (53 tests):** login (validación, normalización, errores), guard de rutas, sesión (login, restore, logout que revoca, fallo del almacén seguro), cliente HTTP (un único refresh ante 401 concurrentes; cierre de sesión si el refresh falla), voz (cancelación, voz elegida o predeterminada, carga asíncrona de voces), atajos 1–9, frases, cámara (errores, respaldo a la cámara predeterminada, apagado al salir) y ajustes.
 
 ## Qué se verificó y qué NO
 
-**Verificado en esta máquina (Windows):**
-- `docker compose up --build`: migraciones + seed automáticos, y flujo register → login → `/phrases` contra Postgres real.
-- Tests del backend (19) y del móvil (13) en verde; `tsc --noEmit` sin errores.
-- `expo export --platform android`: el bundle de Metro compila.
+**Verificado en esta máquina (Windows 11), manejando la app real con Playwright:**
+- Backend con Docker (migraciones y seed automáticos) y preflight CORS desde `app://senavoz`.
+- App compilada servida desde `app://senavoz` y ejecutable empaquetado (`win-unpacked/SenaVoz.exe`):
+  - registro, cierre y reapertura con la sesión recuperada;
+  - 9 frases; clic, tecla y "Probar voz" activan `speechSynthesis`;
+  - webcam real (1280×720) y seña simulada;
+  - lista de voces del sistema (Helena, Laura, Pablo, Raúl, Sabina);
+  - cerrar sesión, que se mantiene tras reabrir.
+- `session.bin` está cifrado: no aparece ningún token en claro.
+- Tests del backend (22) y del escritorio (73) en verde; `tsc` sin errores; `npm run build:win` genera el instalador.
 
-**No verificado (requiere dispositivo/emulador que no se usó aquí):**
-- Ejecución del dev build en Android/iOS: permisos de cámara, preview frontal, audio de `expo-speech`, `expo-secure-store` reales. Los criterios "reabrir la app sin loguearme" y "tocar una tarjeta reproduce voz" están cubiertos por tests unitarios de la lógica, **pero no probados en un dispositivo real**.
-- Build iOS (necesita macOS).
-- La voz depende de que el dispositivo tenga una voz en español (`es-ES`) instalada.
+**No verificado:**
+- Que el audio **se oiga** bien: se comprobó que la síntesis se activa, no la calidad del sonido.
+- La ejecución del instalador NSIS (asistente, accesos directos y desinstalación).
+- macOS y Linux, firma de código y auto-update (fuera de alcance).
 
 ## Decisiones de dependencias
 
-- **Versiones de Expo/React Native**: se usan las que exige Expo SDK 57 (`react-native 0.86`, `react 19.2`, `typescript ~6.0`), no las últimas de npm (RN 0.87, TS 7): `expo install` fija las versiones compatibles con el SDK.
-- **`expo-camera`** en lugar de `react-native-vision-camera` (compatible con SDK 57 y suficiente para el preview; Vision Camera se reevaluará en fase 2 si hace falta procesar frames).
-- **`test-renderer`** en lugar de `react-test-renderer`: lo exige `@testing-library/react-native` 14.
-- **PyJWT** (no python-jose); **psycopg 3**; **SQLAlchemy 2.1** con sesiones síncronas (suficiente para el MVP).
-- Los tokens van solo en `expo-secure-store`; las preferencias de voz (no sensibles) en AsyncStorage.
-- Textos de UI centralizados en `mobile/src/i18n` (solo `es`), listos para añadir otros idiomas.
+- **Electron + electron-vite + React/TypeScript**: reutiliza la lógica TS del MVP móvil (cliente con refresh, stores, i18n). En la Fase 2 `@mediapipe/tasks-vision` corre en el renderer sin código nativo, y `setSinkId` permite la Fase 4.
+- **Vite 7** (no 8) y **TypeScript 5.9**: son las versiones que admite electron-vite 5 y su tsconfig base.
+- **react-router** con `HashRouter` (funciona igual bajo `app://` y en desarrollo), **Zustand**, **TanStack Query**, **react-hook-form + zod 4**.
+- **Vitest** con dos proyectos (main en Node y renderer en jsdom). La lógica del main se escribe con dependencias inyectadas para testearla sin Electron.
+- **Web Speech API** para la voz (voces del sistema). No permite elegir el dispositivo de salida, así que enviar la voz a la reunión requerirá audio pregenerado + `setSinkId` (Fase 4).
+- Las dependencias del renderer son `devDependencies`: Vite las empaqueta, así que no entran en el `app.asar`.
+- El **User-Agent se normaliza a ASCII** ("SenaVoz"), porque con la ñ del nombre Chromium rechazaba las subpeticiones de `app://` y la app empaquetada se quedaba en blanco.
+- Textos de UI centralizados en `desktop/src/renderer/src/i18n` (solo `es`).

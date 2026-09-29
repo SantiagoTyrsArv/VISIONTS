@@ -4,46 +4,54 @@
 
 ```mermaid
 flowchart LR
-  subgraph Phone["Móvil (Expo dev build)"]
-    Cam["expo-camera\n(cámara frontal)"]
-    Rec["SignRecognizer\n(MVP: Mock · F3: TFLite)"]
-    Speech["SpeechService\n(expo-speech · F: audio cacheado)"]
-    UI["Pantallas expo-router\nZustand + TanStack Query"]
-    Store[("expo-secure-store\ntokens")]
-    Cam --> Rec --> Speech
-    UI --> Speech
-    UI --> Store
+  subgraph Desktop["App de escritorio (Electron, Windows)"]
+    subgraph Renderer["Renderer (React)"]
+      Cam["getUserMedia\n(webcam)"]
+      Rec["SignRecognizer\n(MVP: Mock · F3: tasks-vision + modelo)"]
+      Speech["SpeechService\n(Web Speech · F4: audio cacheado + setSinkId)"]
+      UI["React Router\nZustand + TanStack Query"]
+      Cam --> Rec --> Speech
+      UI --> Speech
+    end
+    Main["Proceso main\nprotocolo app:// · permisos"]
+    Store[("safeStorage (DPAPI)\ntokens")]
+    UI -- "IPC (preload)" --> Main --> Store
   end
 
   subgraph Server["Backend (Docker)"]
     API["FastAPI\n/auth /users /phrases"]
     DB[("PostgreSQL")]
-    Worker["Worker de entrenamiento\n(Fase 3, Keras)"]
+    Worker["Worker de entrenamiento\n(Fase 3)"]
     API --> DB
     Worker --> DB
   end
 
-  subgraph Desktop["Companion (Fase 4)"]
-    WS["Web/desktop app"]
-    VCable["Cable de audio virtual"]
-    Meet["Reunión (Zoom/Meet/Teams)"]
-    WS --> VCable --> Meet
-  end
+  VCable["Cable de audio virtual"]
+  Meet["Reunión (Zoom/Meet/Teams)"]
 
   UI -- "HTTPS + JWT" --> API
   Rec -. "F2: secuencias de landmarks" .-> API
-  API -. "F3: modelo .tflite" .-> Rec
-  Speech -. "F4: WebSocket" .-> WS
+  API -. "F3: modelo entrenado" .-> Rec
+  Speech -. "F4: setSinkId" .-> VCable --> Meet
 ```
 
 Las líneas punteadas son fases futuras; el MVP implementa las sólidas.
 
 ## Estructura
 
-- `backend/app/api` routers finos (auth, users, phrases, health) → `services/` (lógica) → `db/models.py`.
-- `backend/app/core` config (pydantic-settings), seguridad (Argon2, JWT, SHA-256), dependencias (usuario actual).
-- `mobile/src/app` rutas expo-router: `(auth)/login|register`, `(app)/home|camera|settings`. El guard de rutas (`Stack.Protected`) depende de `useSession().status`.
-- `mobile/src/api` cliente axios + interceptor; `mobile/src/store` Zustand; `mobile/src/services` abstracciones futuras.
+- `backend/app/api`: routers finos (auth, users, phrases, health) → `services/` (lógica) → `db/models.py`.
+- `backend/app/core`: config (pydantic-settings), seguridad (Argon2, JWT, SHA-256), dependencias (usuario actual).
+- `desktop/src/main`: arranque de Electron. Protocolo `app://senavoz` (`appProtocol.ts`, resolución segura de rutas), permisos y navegación (`security.ts`), almacén de tokens cifrado (`tokenStore.ts`) y User-Agent ASCII (`userAgent.ts`). La lógica va en funciones puras con dependencias inyectadas, testeadas sin Electron.
+- `desktop/src/preload`: expone con `contextBridge` solo `window.senavoz.tokens.{get, save, clear}`.
+- `desktop/src/shared/ipc.ts`: contrato IPC (tipos y nombres de canal) compartido por main, preload y renderer.
+- `desktop/src/renderer/src`:
+  - `routes/`: pantallas y guard (`RequireAuth` / `RequireGuest` según `useSession().status`).
+  - `api/`: cliente axios + interceptor.
+  - `store/`: Zustand (sesión, ajustes).
+  - `services/`: voz, cámara y reconocimiento, detrás de interfaces.
+  - `hooks/`: atajos de teclado.
+  - `ui/`: componentes.
+  - `i18n/`: textos.
 
 ## Autenticación
 
@@ -52,9 +60,10 @@ Las líneas punteadas son fases futuras; el MVP implementa las sólidas.
 3. `refresh` **rota**: marca el token usado como `revoked_at` y `replaced_by = nuevo`.
 4. Reutilizar un refresh ya revocado se interpreta como posible robo: se revocan **todos** los refresh del usuario.
 5. `logout` revoca el refresh recibido (idempotente).
-6. En el móvil, el interceptor ante un 401 hace **un único** refresh compartido por todas las peticiones concurrentes y reintenta; si falla, limpia el almacén seguro y cierra la sesión.
+6. En la app, ante un 401 el interceptor hace **un único** refresh, compartido por todas las peticiones concurrentes, y reintenta. Si falla, borra los tokens y cierra la sesión.
+7. Los tokens viven cifrados en el proceso main (`safeStorage`). El renderer los pide por IPC y guarda una copia en memoria. Si el cifrado del sistema no está disponible, `save` falla y la sesión no se guarda.
 
-Errores de login genéricos ("Correo o contraseña incorrectos") y verificación Argon2 contra un hash señuelo cuando el email no existe, para no filtrar existencia por mensaje ni por tiempo.
+Los errores de login son genéricos ("Correo o contraseña incorrectos"). Cuando el email no existe, Argon2 verifica contra un hash señuelo, para no filtrar si existe ni por mensaje ni por tiempo.
 
 ## Modelo de datos
 
@@ -79,36 +88,41 @@ Implementado (migración `0001`): `users`, `refresh_tokens`, `phrases`.
 | id | UUID PK | |
 | user_id | UUID FK → users | |
 | version | int | incremental por usuario |
-| tflite_path | text | ubicación del `.tflite` (disco/objeto) |
+| model_path | text | ubicación del modelo exportado (formato por decidir en la Fase 3) |
 | metrics | JSON | accuracy, matriz de confusión, nº de muestras… |
 | created_at | timestamptz | |
 
 ## Decisiones
 
-**Inferencia on-device.** El reconocimiento corre en el teléfono (MediaPipe + TFLite). Latencia baja y predecible para conversación en vivo, funciona sin red, y el vídeo del usuario nunca sale del dispositivo (solo se suben landmarks numéricos, y solo en la fase de grabación de muestras).
+**App de escritorio (Electron).** La app corre en el mismo PC que la videollamada. Así la voz puede ir directamente a un cable de audio virtual que la reunión usa como micrófono, sin companion ni WebSocket. Electron permite reutilizar la lógica TS del MVP móvil y ejecutar `@mediapipe/tasks-vision` (WASM/GPU) en el renderer sin código nativo. Plataforma objetivo: Windows.
 
-**Entrenamiento en servidor.** Entrenar una red LSTM/GRU pequeña es costoso para un móvil y conviene en batch; el servidor recibe muestras, entrena, evalúa y exporta un `.tflite` versionado que el móvil descarga. Separa el ciclo de mejora del ciclo de publicación de la app.
+**Protocolo propio `app://senavoz`.** La UI no se carga desde `file://`, cuyo origen `null` complica CORS y la CSP. `app://senavoz` da un origen estable que el backend autoriza en `CORS_ORIGINS`, y el handler solo sirve archivos dentro de la carpeta de la UI. Electron incluye el nombre de la app en el User-Agent, así que se normaliza a ASCII: con la ñ, Chromium rechaza las subpeticiones de `app://`.
 
-**TTS pregenerado/cacheado.** Las frases son un conjunto cerrado y pequeño; se pueden pregenerar con una voz de mayor calidad que la del sistema, descargarlas una vez y reproducirlas localmente (latencia mínima, sin red, voz consistente). `SpeechService` ya abstrae esto: hoy `ExpoSpeechService` (TTS del dispositivo); `CachedAudioSpeechService` ya reproduce un audio local por `code` con `expo-audio` y cae al TTS si no hay audio. Falta solo el pipeline de generación/descarga.
+**Proceso main mínimo y aislado.** Main solo gestiona ventana, protocolo, permisos (solo cámara) y tokens. Toda la lógica de producto está en el renderer, con `contextIsolation` + `sandbox`. El preload expone una API de tres funciones.
 
-**Audio hacia la reunión.** Un teléfono no puede inyectar audio en el micrófono de una app de videollamada. Se resuelve en la Fase 4 con un companion en el PC: el móvil envía la frase por WebSocket, el companion la reproduce en un dispositivo de audio virtual (VB‑Cable / BlackHole / PulseAudio null-sink) que la reunión usa como micrófono.
+**Inferencia local.** El reconocimiento correrá en el PC (MediaPipe Hand Landmarker + modelo propio). La latencia es baja y predecible para conversar en vivo, funciona sin red y el vídeo nunca sale del equipo: solo se suben landmarks numéricos, y solo al grabar muestras.
 
-**Interfaces desacopladas.** `SignRecognizer` y `SpeechService` son el contrato entre la UI y las capacidades cambiantes. `MockSignRecognizer` demuestra el flujo seña → voz sin ML; la pantalla de cámara solo conoce la interfaz.
+**Entrenamiento en servidor.** Una red LSTM/GRU pequeña conviene entrenarla en lote. El servidor recibe muestras, entrena, evalúa y exporta un modelo versionado que la app descarga. Así el ciclo de mejora del modelo va separado del de publicación de la app.
+
+**TTS pregenerado/cacheado.** Las frases son un conjunto cerrado y pequeño. Se pueden pregenerar con una voz de más calidad que la del sistema y reproducirlas localmente. `SpeechService` ya abstrae esto: hoy usa `WebSpeechService` (voces del sistema), y `CachedAudioSpeechService` ya reproduce un audio local por `code` y cae al TTS si no hay audio.
+
+**Audio hacia la reunión.** `speechSynthesis` no permite elegir el dispositivo de salida, así que la voz del sistema no puede ir al cable virtual. En la Fase 4 se usarán audios pregenerados reproducidos con `HTMLAudioElement.setSinkId()` hacia el dispositivo virtual (VB-Cable), que la reunión usa como micrófono.
+
+**Interfaces desacopladas.** `SignRecognizer` y `SpeechService` son el contrato entre la UI y las capacidades cambiantes. `MockSignRecognizer` demuestra el flujo seña → voz sin ML, y la pantalla de cámara solo conoce la interfaz.
 
 ## Roadmap
 
 ### Fase 2 — Captura de datos
-- MediaPipe Hand Landmarker en vivo sobre la cámara.
-- Grabación de secuencias de **30 frames × 126 valores** (2 manos × 21 puntos × xyz), normalizadas respecto a la muñeca (mano ausente → ceros).
+- `@mediapipe/tasks-vision` (HandLandmarker, modo VIDEO) sobre la webcam, en el renderer.
+- Grabación **en ráfaga con cuenta atrás**: 3‑2‑1, 30 frames, pausa, y repetir hasta N muestras por frase.
+- Secuencias de **30 frames × 126 valores** (2 manos × 21 puntos × xyz), normalizadas respecto a la muñeca (mano ausente → ceros). Normalización en TypeScript puro, reutilizable para la inferencia.
 - Subida al backend: `POST /samples` → tabla `sign_samples`.
-- Evaluar `react-native-vision-camera` + frame processors si `expo-camera` no da acceso a frames.
 
 ### Fase 3 — Entrenamiento e inferencia
-- Worker Keras (LSTM/GRU pequeña) por usuario, con clase **"neutral"** para el reposo, umbral de confianza y *cooldown* entre detecciones para evitar repeticiones.
-- Exportación a TFLite, registro en `ml_models`, endpoint de descarga.
-- `TfliteSignRecognizer` con `react-native-fast-tflite`, implementando `SignRecognizer` sin tocar la UI.
+- Worker de entrenamiento (LSTM/GRU pequeña) por usuario, con clase **"neutral"** para el reposo, umbral de confianza y *cooldown* entre detecciones para evitar repeticiones.
+- Registro en `ml_models` y endpoint de descarga.
+- Inferencia en el renderer implementando `SignRecognizer` sin tocar la UI. **Dirección, no decisión:** TF.js u ONNX Runtime Web.
 
 ### Fase 4 — Voz hacia la reunión
-- Companion web/desktop conectado por WebSocket al móvil.
-- Reproducción por cable de audio virtual enrutado como micrófono de la reunión.
-- Audios pregenerados/cacheados para baja latencia.
+- Audios pregenerados/cacheados por frase.
+- Selección del dispositivo de salida (`setSinkId`) hacia el cable de audio virtual enrutado como micrófono de la reunión.
