@@ -1,0 +1,50 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.error {
+  color: var(--danger);
+  font-weight: 600;
+  margin: 0;
+}
+.link {
+  color: var(--primary);
+  text-align: center;
+  padding: 12px;
+  font-size: 17px;
+}
+.shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  height: 100%;
+}
+.sidebar {
+  background: var(--surface);
+  padding: 24px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sidebarBrand {
+  color: var(--card);
+  font-size: 26px;
+  font-weight: 900;
+  padding: 0 12px 16px;
+  margin: 0;
+}
+.navLink {
+  color: var(--text);
+  text-decoration: none;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 17px;
+}
+.navLink[aria-current='page'] {
+  background: var(--border);
+}
+.content {
+  overflow: auto;
+  padding: 28px;
+}

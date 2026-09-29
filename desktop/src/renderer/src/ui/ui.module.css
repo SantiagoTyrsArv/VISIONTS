@@ -1,0 +1,76 @@
+.button {
+  min-height: 48px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 17px;
+  cursor: pointer;
+  background: var(--primary);
+  color: var(--primary-text);
+}
+.secondary {
+  background: var(--border);
+  color: var(--text);
+}
+.danger {
+  background: var(--danger);
+  color: var(--primary-text);
+}
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.label {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.input {
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 17px;
+}
+.input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+.fieldError {
+  color: var(--danger);
+  font-weight: 600;
+}
+.auth {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.authBox {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.brand {
+  color: var(--card);
+  font-size: 40px;
+  font-weight: 900;
+  margin: 0;
+}
+.title {
+  font-size: 24px;
+  margin: 0 0 8px;
+}
+.splash {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}

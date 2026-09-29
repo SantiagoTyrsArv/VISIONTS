@@ -1,0 +1,35 @@
+:root {
+  --bg: #0b1220;
+  --surface: #16213a;
+  --card: #ffd60a;
+  --card-text: #111827;
+  --text: #ffffff;
+  --text-muted: #b6c2d9;
+  --primary: #4da3ff;
+  --primary-text: #04121f;
+  --danger: #ff6b6b;
+  --border: #3a4a6b;
+  color-scheme: dark;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+}
+:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+button {
+  font: inherit;
+}
