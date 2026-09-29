@@ -121,6 +121,7 @@ npm run typecheck     # tsc para main/preload y renderer
   - lista de voces del sistema (Helena, Laura, Pablo, Raúl, Sabina);
   - cerrar sesión, que se mantiene tras reabrir.
 - `session.bin` está cifrado: no aparece ningún token en claro.
+- Modo desarrollo (servidor de Vite con HMR): la UI carga bajo la CSP sin errores.
 - Tests del backend (22) y del escritorio (73) en verde; `tsc` sin errores; `npm run build:win` genera el instalador.
 
 **No verificado:**
