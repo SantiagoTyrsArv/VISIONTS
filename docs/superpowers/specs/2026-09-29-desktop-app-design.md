@@ -76,7 +76,7 @@ desktop/
 
 ### Configuración
 
-- `VITE_API_URL` (por defecto `http://localhost:8000`), inyectada en tiempo de build. `.env.example` en `desktop/`.
+- `RENDERER_VITE_API_URL` (por defecto `http://localhost:8000`; prefijo exigido por electron-vite), inyectada en tiempo de build. `.env.example` en `desktop/`. La CSP se define en `index.html` con `%RENDERER_VITE_API_URL%`.
 
 ## Reutilización del código móvil
 
