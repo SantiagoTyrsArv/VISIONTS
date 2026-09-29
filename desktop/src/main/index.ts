@@ -7,6 +7,10 @@ import { IPC, type Tokens } from '../shared/ipc';
 import { APP_ORIGIN, APP_SCHEME, resolveAppPath } from './appProtocol';
 import { allowPermission, isTrustedOrigin } from './security';
 import { createTokenStore } from './tokenStore';
+import { asciiUserAgent } from './userAgent';
+
+// Antes de crear cualquier ventana: el User-Agent debe ser ASCII (ver userAgent.ts).
+app.userAgentFallback = asciiUserAgent(app.userAgentFallback);
 
 const devUrl = !app.isPackaged ? process.env['ELECTRON_RENDERER_URL'] : undefined;
 const rendererRoot = join(__dirname, '../renderer');
