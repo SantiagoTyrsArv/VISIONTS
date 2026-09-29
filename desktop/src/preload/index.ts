@@ -1,22 +1,13 @@
-import { contextBridge } from 'electron'
-import { electronAPI } from '@electron-toolkit/preload'
+import { contextBridge, ipcRenderer } from 'electron';
 
-// Custom APIs for renderer
-const api = {}
+import { IPC, type SenavozApi, type Tokens } from '../shared/ipc';
 
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
-if (process.contextIsolated) {
-  try {
-    contextBridge.exposeInMainWorld('electron', electronAPI)
-    contextBridge.exposeInMainWorld('api', api)
-  } catch (error) {
-    console.error(error)
-  }
-} else {
-  // @ts-ignore (define in dts)
-  window.electron = electronAPI
-  // @ts-ignore (define in dts)
-  window.api = api
-}
+const api: SenavozApi = {
+  tokens: {
+    get: () => ipcRenderer.invoke(IPC.tokensGet),
+    save: (tokens: Tokens) => ipcRenderer.invoke(IPC.tokensSave, tokens),
+    clear: () => ipcRenderer.invoke(IPC.tokensClear),
+  },
+};
+
+contextBridge.exposeInMainWorld('senavoz', api);
