@@ -63,7 +63,7 @@ http.interceptors.response.use(
   },
 );
 
-/** Extrae el `detail` de errores de FastAPI (string) si existe. */
+/** Código HTTP de un error de axios (undefined si no hubo respuesta). */
 export function apiErrorStatus(error: unknown): number | undefined {
   return axios.isAxiosError(error) ? error.response?.status : undefined;
 }
