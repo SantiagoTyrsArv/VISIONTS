@@ -13,10 +13,11 @@ services:
       timeout: 3s
       retries: 20
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"  # solo accesible desde tu máquina
 
   api:
     build: ./backend
+    # Credenciales y JWT_SECRET por defecto: SOLO para desarrollo local. Sobrescribir vía .env.
     env_file:
       - ./backend/.env.example
     environment:

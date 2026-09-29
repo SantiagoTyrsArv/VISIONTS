@@ -30,7 +30,8 @@ def login(request: Request, data: LoginIn, db: Session = Depends(get_db)):
 
 
 @router.post("/refresh", response_model=TokenPair)
-def refresh(data: RefreshIn, db: Session = Depends(get_db)):
+@limiter.limit(_settings.rate_limit_refresh)
+def refresh(request: Request, data: RefreshIn, db: Session = Depends(get_db)):
     try:
         return auth_service.refresh(db, data.refresh_token)
     except auth_service.AuthError as e:
