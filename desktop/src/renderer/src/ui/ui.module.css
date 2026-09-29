@@ -74,3 +74,27 @@
   place-items: center;
   color: var(--text-muted);
 }
+.card {
+  position: relative;
+  min-height: 130px;
+  padding: 16px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--card);
+  color: var(--card-text);
+  font-size: 24px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.card:active {
+  transform: scale(0.97);
+  opacity: 0.8;
+}
+.shortcut {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0.6;
+}
