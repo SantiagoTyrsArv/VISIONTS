@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-senavoz}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-senavoz}
+      POSTGRES_DB: ${POSTGRES_DB:-senavoz}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "127.0.0.1:5432:5432"  # solo accesible desde tu máquina
+
+  api:
+    build: ./backend
+    # Credenciales y JWT_SECRET por defecto: SOLO para desarrollo local. Sobrescribir vía .env.
+    env_file:
+      - ./backend/.env.example
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-senavoz}:${POSTGRES_PASSWORD:-senavoz}@db:5432/${POSTGRES_DB:-senavoz}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-dev-only-change-me}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,app://senavoz}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:
