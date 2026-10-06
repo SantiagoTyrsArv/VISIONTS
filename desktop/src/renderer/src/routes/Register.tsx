@@ -22,7 +22,7 @@ export default function Register() {
     formState: { isSubmitting },
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { displayName: '', email: '', password: '' },
+    defaultValues: { displayName: '', email: '', password: '', confirmPassword: '' },
   });
 
   const onSubmit = handleSubmit(async ({ displayName, email, password }) => {
@@ -57,6 +57,13 @@ export default function Register() {
           type="password"
           autoComplete="new-password"
         />
+        <FormField
+          control={control}
+          name="confirmPassword"
+          label={t('auth.confirmPassword')}
+          type="password"
+          autoComplete="new-password"
+        />
         {serverError ? (
           <p role="alert" className={styles.error}>
             {serverError}
@@ -75,3 +82,4 @@ export default function Register() {
     </AuthScreen>
   );
 }
+

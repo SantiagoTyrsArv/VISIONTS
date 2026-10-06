@@ -20,11 +20,18 @@ export const loginSchema = z.object({
   password: z.string().min(1, t('validation.passwordRequired')),
 });
 
-export const registerSchema = z.object({
-  displayName: z.string().trim().min(1, t('validation.nameRequired')).max(100),
-  email,
-  password: newPassword,
-});
+export const registerSchema = z
+  .object({
+    displayName: z.string().trim().min(1, t('validation.nameRequired')).max(100),
+    email,
+    password: newPassword,
+    confirmPassword: z.string().min(1, t('validation.confirmPasswordRequired')),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: t('validation.passwordMismatch'),
+    path: ['confirmPassword'],
+  });
 
 export type LoginForm = z.infer<typeof loginSchema>;
 export type RegisterForm = z.infer<typeof registerSchema>;
+
