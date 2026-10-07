@@ -24,6 +24,8 @@ export const es = {
     'Si hay una cuenta asociada a este correo, recibirás un enlace para restablecer tu contraseña en:',
   'auth.forgot.backToLogin': 'Volver al inicio de sesión',
   'auth.loading': 'Un momento…',
+  'auth.claim': 'Tus señas, con voz en cualquier reunión.',
+  'auth.claimSub': 'Funciona con Zoom, Teams, Google Meet y cualquier app que use un micrófono.',
 
   'validation.emailRequired': 'Ingresa tu correo electrónico',
   'validation.emailInvalid': 'El correo electrónico no es válido',

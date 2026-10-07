@@ -28,6 +28,12 @@ async function fill(user: ReturnType<typeof userEvent.setup>, email: string, pas
 }
 
 describe('pantalla de login', () => {
+  it('muestra el mensaje de marca junto al formulario', () => {
+    setup();
+    expect(screen.getByText('Tus señas, con voz en cualquier reunión.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
+  });
+
   it('muestra errores de validación en español y no llama al servidor', async () => {
     const user = setup();
     await user.click(screen.getByRole('button', { name: 'Entrar' }));

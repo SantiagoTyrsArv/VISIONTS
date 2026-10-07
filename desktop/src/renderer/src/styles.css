@@ -1,27 +1,35 @@
 :root {
-  /* Base: tinta azul profunda; el amarillo "señal" se reserva para lo que habla (frases). */
-  --bg: #0e1626;
-  --surface: #162036;
-  --surface-raised: #1d2944;
-  --border: #2c3b5c;
-  --border-strong: #3e5079;
-  --text: #f3f5fa;
-  --text-muted: #a9b6ce;
-  --card: #ffd60a;
-  --card-press: #f0c400;
-  --card-text: #14120a;
-  --primary: #7cb8ff;
-  --primary-strong: #4da3ff;
-  --primary-text: #04121f;
-  --danger: #ff7a7a;
-  --danger-bg: rgba(255, 122, 122, 0.12);
+  /* Grafito: no deslumbra junto a Zoom o Teams. Ámbar solo para lo que habla;
+     azul solo para estados activo/detectado (se distinguen también por luminosidad). */
+  --bg: #0f1114;
+  --surface: #181b20;
+  --surface-side: #14171b;
+  --surface-raised: #22262d;
+  --border: #262a31;
+  --border-strong: #3a404b;
+  --text: #f2f0ea;
+  --text-muted: #a3a8b3;
+  --text-nav: #b4b9c3;
+  --accent: #ffb547;
+  --accent-press: #f0a52f;
+  --accent-text: #1a1206;
+  --accent-soft: #2a2418;
+  --live: #7ab8ff;
+  --live-soft: #1c2a3d;
+  --live-text: #a9d0ff;
+  --warn-bg: #221d14;
+  --warn-border: #4a3b1f;
+  --warn-text: #d9cdb6;
+  --danger: #ffa597;
+  --danger-border: #6b3b36;
+  --danger-bg: rgba(255, 165, 151, 0.12);
 
   --radius-s: 10px;
   --radius-m: 14px;
-  --radius-l: 22px;
+  --radius-l: 18px;
 
-  --font-display: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
-  --font-text: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-text: 'Atkinson Hyperlegible', 'Segoe UI', system-ui, sans-serif;
 
   color-scheme: dark;
   font-family: var(--font-text);
@@ -48,7 +56,7 @@ h3 {
   font-family: var(--font-display);
 }
 :focus-visible {
-  outline: 3px solid var(--primary);
+  outline: 3px solid var(--live);
   outline-offset: 3px;
 }
 button,
@@ -57,8 +65,8 @@ select {
   font: inherit;
 }
 ::selection {
-  background: var(--card);
-  color: var(--card-text);
+  background: var(--accent);
+  color: var(--accent-text);
 }
 @media (prefers-reduced-motion: reduce) {
   *,
