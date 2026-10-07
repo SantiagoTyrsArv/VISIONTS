@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen, type RenderResult } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { HashRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Camera from '@/routes/Camera';
@@ -51,7 +52,9 @@ function renderScreen(): RenderResult {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <Camera />
+      <HashRouter>
+        <Camera />
+      </HashRouter>
     </QueryClientProvider>,
   );
 }
@@ -114,5 +117,23 @@ describe('pantalla de cámara', () => {
     unmount();
     await vi.waitFor(() => expect(stop).toHaveBeenCalled());
     expect(recognizerMock.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('panel de estado: cámara activa y modelo no instalado, con enlace a Frases', async () => {
+    openCamera.mockResolvedValue(fakeStream);
+    renderScreen();
+    expect(await screen.findByText('Falta un modelo entrenado')).toBeInTheDocument();
+    expect(screen.getByText('No instalado')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ir a Frases' })).toHaveAttribute('href', '#/frases');
+  });
+
+  it('las señas reconocidas aparecen en "Últimas señas"', async () => {
+    openCamera.mockResolvedValue(fakeStream);
+    renderScreen();
+    await screen.findByText(/Detector activo/);
+    await act(async () => {
+      recognizerMock.emitSign({ code: 'hello', confidence: 0.9 });
+    });
+    expect(screen.getByRole('list', { name: 'Últimas señas' })).toHaveTextContent('Hola');
   });
 });
