@@ -8,6 +8,7 @@ import Camera from '@/routes/Camera';
 import ForgotPassword from '@/routes/ForgotPassword';
 import { RequireAuth, RequireGuest } from '@/routes/Guard';
 import Login from '@/routes/Login';
+import Meeting from '@/routes/Meeting';
 import Phrases from '@/routes/Phrases';
 import Register from '@/routes/Register';
 import Settings from '@/routes/Settings';
@@ -33,6 +34,7 @@ export function App() {
               <Route path="/camara" element={<Camera />} />
               <Route path="/ajustes" element={<Settings />} />
             </Route>
+            <Route path="/reunion" element={<Meeting />} />
           </Route>
           <Route path="*" element={<Navigate to="/frases" replace />} />
         </Routes>
