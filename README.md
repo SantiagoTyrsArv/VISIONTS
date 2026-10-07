@@ -1,6 +1,6 @@
 # SeñaVoz
 
-App de escritorio (Windows) que traducirá a voz las señas más comunes en una reunión. **Este MVP** incluye el monorepo, la autenticación completa (JWT con rotación de refresh tokens), el catálogo de frases con reproducción de voz y una pantalla de cámara con un reconocedor de señas *simulado*. El reconocimiento real (MediaPipe + modelo propio) y la salida de voz hacia la reunión llegan en las fases 2–4 (ver [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
+App de escritorio (Windows) para traducir señas a voz. Incluye autenticación, catálogo de frases, reproducción de voz y detección local de manos con MediaPipe. La traducción de señas requiere un modelo semántico entrenado, que aún no está incluido; la salida de voz hacia reuniones también está pendiente (ver [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
 
 ```
 senavoz/
@@ -12,13 +12,13 @@ senavoz/
 
 ## Requisitos
 
-| Para | Necesitas |
-|---|---|
-| Backend con Docker | Docker + Docker Compose |
-| Backend sin Docker / tests | Python 3.12+ (Docker usa 3.12; los tests también pasan en 3.14) |
-| App de escritorio | Node.js 20+ (probado con 24), npm, Windows 10/11 |
-| Voz | Una voz en español instalada en Windows (Configuración › Hora e idioma › Voz) |
-| Cámara | Una webcam |
+| Para                       | Necesitas                                                                     |
+| -------------------------- | ----------------------------------------------------------------------------- |
+| Backend con Docker         | Docker + Docker Compose                                                       |
+| Backend sin Docker / tests | Python 3.12+ (Docker usa 3.12; los tests también pasan en 3.14)               |
+| App de escritorio          | Node.js 20+ (probado con 24), npm, Windows 10/11                              |
+| Voz                        | Una voz en español instalada en Windows (Configuración › Hora e idioma › Voz) |
+| Cámara                     | Una webcam                                                                    |
 
 ## Backend
 
@@ -44,27 +44,27 @@ uvicorn app.main:app --reload
 
 ### Endpoints
 
-| Método | Ruta | Auth | Descripción |
-|---|---|---|---|
-| POST | `/auth/register` | – | 201 + usuario (nunca el hash). Contraseña ≥ 8, letra y número |
-| POST | `/auth/login` | – | `{access_token, refresh_token, token_type, expires_in}` |
-| POST | `/auth/refresh` | – | Nuevo par; **rota** el refresh. Reutilizar uno ya rotado revoca todas las sesiones del usuario |
-| POST | `/auth/logout` | – | 204; revoca ese refresh token (idempotente) |
-| GET | `/users/me` | Bearer | Perfil |
-| GET | `/phrases` | Bearer | Catálogo de frases |
-| GET | `/health` | – | Liveness |
+| Método | Ruta             | Auth   | Descripción                                                                                    |
+| ------ | ---------------- | ------ | ---------------------------------------------------------------------------------------------- |
+| POST   | `/auth/register` | –      | 201 + usuario (nunca el hash). Contraseña ≥ 8, letra y número                                  |
+| POST   | `/auth/login`    | –      | `{access_token, refresh_token, token_type, expires_in}`                                        |
+| POST   | `/auth/refresh`  | –      | Nuevo par; **rota** el refresh. Reutilizar uno ya rotado revoca todas las sesiones del usuario |
+| POST   | `/auth/logout`   | –      | 204; revoca ese refresh token (idempotente)                                                    |
+| GET    | `/users/me`      | Bearer | Perfil                                                                                         |
+| GET    | `/phrases`       | Bearer | Catálogo de frases                                                                             |
+| GET    | `/health`        | –      | Liveness                                                                                       |
 
 Access token: 15 min. Refresh token: 7 días, `secrets.token_urlsafe`, guardado como SHA-256. Rate limiting por IP en login (5/min), register (10/min) y refresh (30/min).
 
 ### Variables de entorno (`backend/.env.example`)
 
-| Variable | Descripción |
-|---|---|
-| `DATABASE_URL` | URL SQLAlchemy (`postgresql+psycopg://...`) |
-| `JWT_SECRET` | Secreto de firma, ≥ 32 caracteres. **Solo por entorno** |
-| `ACCESS_TOKEN_MINUTES` / `REFRESH_TOKEN_DAYS` | Vigencias (15 / 7) |
-| `CORS_ORIGINS` | Orígenes permitidos separados por comas. Para la app: `http://localhost:5173,app://senavoz` |
-| `RATE_LIMIT_LOGIN` / `_REGISTER` / `_REFRESH` | Formato slowapi, p. ej. `5/minute` |
+| Variable                                      | Descripción                                                                                 |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                | URL SQLAlchemy (`postgresql+psycopg://...`)                                                 |
+| `JWT_SECRET`                                  | Secreto de firma, ≥ 32 caracteres. **Solo por entorno**                                     |
+| `ACCESS_TOKEN_MINUTES` / `REFRESH_TOKEN_DAYS` | Vigencias (15 / 7)                                                                          |
+| `CORS_ORIGINS`                                | Orígenes permitidos separados por comas. Para la app: `http://localhost:5173,app://senavoz` |
+| `RATE_LIMIT_LOGIN` / `_REGISTER` / `_REFRESH` | Formato slowapi, p. ej. `5/minute`                                                          |
 
 Nota: el límite de peticiones usa la memoria del proceso. Con varios workers o réplicas habría que moverlo a Redis.
 
@@ -84,7 +84,7 @@ npm run build:win           # instalador en desktop/release/SenaVoz-Setup-<versi
 
 1. Regístrate (entras directamente) o inicia sesión. La sesión se mantiene al cerrar y reabrir la app.
 2. **Frases**: haz clic en una tarjeta (o pulsa Enter/Espacio) y se reproduce en voz. **Atajos 1–9** para las nueve primeras frases; no se disparan mientras escribes ni con Ctrl/Alt.
-3. **Cámara**: vista de la webcam en espejo y el aviso "Reconocimiento de señas: próximamente". El panel de *Depuración* dispara una seña simulada (recorre las frases) y la reproduce en voz. Si hay varias webcams aparece un selector. Si la cámara falta, está bloqueada por Windows o la usa otra app (Zoom, Teams…), se muestra un mensaje específico con "Reintentar".
+3. **Cámara**: vista de la webcam en espejo; MediaPipe detecta hasta dos manos y muestra su estado. La app empaqueta el runtime WASM y el modelo de detección, por lo que no necesita descargar esos archivos al iniciarse. Para traducir una seña a una frase y voz todavía hace falta configurar un clasificador entrenado. Si hay varias webcams aparece un selector; los errores de permiso y cámara mantienen su mensaje específico y opción "Reintentar".
 4. **Ajustes**: perfil, voz del sistema (voces `es-*` instaladas), volumen, velocidad, cámara preferida (si se desenchufa, se usa la predeterminada) y **Cerrar sesión**, que revoca el refresh token en el servidor.
 
 ### Seguridad
@@ -108,11 +108,12 @@ npm run typecheck     # tsc para main/preload y renderer
 
 - **Backend (22 tests):** registro, email duplicado, contraseñas débiles, login correcto e incorrecto (respuestas indistinguibles), rate limit, `/users/me` con y sin token, refresh con rotación, detección de reutilización, refresh expirado, logout, frases, seed idempotente y CORS de los orígenes de escritorio.
 - **Escritorio, main (20 tests):** almacén de tokens cifrado (incluidos archivo corrupto y cifrado no disponible), resolución de rutas de `app://` (path traversal, también codificado), orígenes y permisos de confianza, y User-Agent ASCII.
-- **Escritorio, renderer (53 tests):** login (validación, normalización, errores), guard de rutas, sesión (login, restore, logout que revoca, fallo del almacén seguro), cliente HTTP (un único refresh ante 401 concurrentes; cierre de sesión si el refresh falla), voz (cancelación, voz elegida o predeterminada, carga asíncrona de voces), atajos 1–9, frases, cámara (errores, respaldo a la cámara predeterminada, apagado al salir) y ajustes.
+- **Escritorio, renderer (71 tests):** login, guard de rutas, sesión, cliente HTTP, voz, atajos, frases, ajustes, cámara y reconocimiento (normalización 30×126, clasificación con umbral/cooldown y ciclo de vida de MediaPipe).
 
 ## Qué se verificó y qué NO
 
 **Verificado en esta máquina (Windows 11), manejando la app real con Playwright:**
+
 - Backend con Docker (migraciones y seed automáticos) y preflight CORS desde `app://senavoz`.
 - App compilada servida desde `app://senavoz` y ejecutable empaquetado (`win-unpacked/SenaVoz.exe`):
   - registro, cierre y reapertura con la sesión recuperada;
@@ -122,16 +123,19 @@ npm run typecheck     # tsc para main/preload y renderer
   - cerrar sesión, que se mantiene tras reabrir.
 - `session.bin` está cifrado: no aparece ningún token en claro.
 - Modo desarrollo (servidor de Vite con HMR): la UI carga bajo la CSP sin errores.
-- Tests del backend (22) y del escritorio (73) en verde; `tsc` sin errores; `npm run build:win` genera el instalador.
+- Para esta entrega, 18 tests del reconocimiento pasan; `npm run build` y TypeScript pasan, y el artefacto incluye el modelo Hand Landmarker y los WASM locales.
 
 **No verificado:**
+
+- La detección con una webcam física no se comprobó manualmente en esta sesión. El clasificador semántico y la emisión de voz por predicciones reales requieren un modelo entrenado, que no está disponible en el proyecto.
+- La suite completa del escritorio tiene 3 fallos existentes en `client.test.ts` (88 de 91 tests pasan); no corresponden al reconocimiento de cámara.
 - Que el audio **se oiga** bien: se comprobó que la síntesis se activa, no la calidad del sonido.
 - La ejecución del instalador NSIS (asistente, accesos directos y desinstalación).
 - macOS y Linux, firma de código y auto-update (fuera de alcance).
 
 ## Decisiones de dependencias
 
-- **Electron + electron-vite + React/TypeScript**: reutiliza la lógica TS del MVP móvil (cliente con refresh, stores, i18n). En la Fase 2 `@mediapipe/tasks-vision` corre en el renderer sin código nativo, y `setSinkId` permite la Fase 4.
+- **Electron + electron-vite + React/TypeScript**: reutiliza la lógica TS del MVP móvil (cliente con refresh, stores, i18n). `@mediapipe/tasks-vision` corre en el renderer sin código nativo; detección de manos disponible, clasificador semántico pendiente. `setSinkId` queda para la Fase 4.
 - **Vite 7** (no 8) y **TypeScript 5.9**: son las versiones que admite electron-vite 5 y su tsconfig base.
 - **react-router** con `HashRouter` (funciona igual bajo `app://` y en desarrollo), **Zustand**, **TanStack Query**, **react-hook-form + zod 4**.
 - **Vitest** con dos proyectos (main en Node y renderer en jsdom). La lógica del main se escribe con dependencias inyectadas para testearla sin Electron.

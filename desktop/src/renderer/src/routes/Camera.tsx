@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { JSX } from 'react';
 
 import { usePhrases } from '@/api/usePhrases';
 import { t } from '@/i18n';
@@ -8,8 +9,8 @@ import {
   openCamera,
   type CameraErrorKey,
 } from '@/services/camera/camera';
-import { MockSignRecognizer } from '@/services/recognition/MockSignRecognizer';
-import type { SignRecognizer } from '@/services/recognition/SignRecognizer';
+import { MediaPipeSignRecognizer } from '@/services/recognition/MediaPipeSignRecognizer';
+import type { RecognitionStatus } from '@/services/recognition/SignRecognizer';
 import { speechService } from '@/services/speech';
 import { useSettings } from '@/store/settings';
 import { Button } from '@/ui/Button';
@@ -18,7 +19,7 @@ import styles from './routes.module.css';
 
 type CamState = { kind: 'starting' } | { kind: 'ready' } | { kind: 'error'; key: CameraErrorKey };
 
-export default function Camera() {
+export default function Camera(): JSX.Element {
   const videoRef = useRef<HTMLVideoElement>(null);
   const cameraId = useSettings((s) => s.cameraId);
   const setCameraId = useSettings((s) => s.setCameraId);
@@ -27,12 +28,7 @@ export default function Camera() {
   const [attempt, setAttempt] = useState(0);
   const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
   const [lastSign, setLastSign] = useState<string | null>(null);
-  const [debugIndex, setDebugIndex] = useState(0);
-
-  // Fase 3: sustituir por el reconocedor real. El resto de la pantalla solo
-  // conoce la interfaz SignRecognizer.
-  const recognizer = useMemo(() => new MockSignRecognizer(), []);
-  const recognizerApi: SignRecognizer = recognizer;
+  const [recognition, setRecognition] = useState<RecognitionStatus | null>(null);
 
   // Catálogo accesible desde el callback sin re-suscribirse en cada render.
   const phrasesRef = useRef(phrases);
@@ -41,7 +37,11 @@ export default function Camera() {
   });
 
   useEffect(() => {
+    const videoElement = videoRef.current;
     let stream: MediaStream | null = null;
+    let recognizer: MediaPipeSignRecognizer | null = null;
+    let unsubscribeSign: (() => void) | null = null;
+    let unsubscribeStatus: (() => void) | null = null;
     let cancelled = false;
     openCamera(cameraId)
       .then(async (s) => {
@@ -50,7 +50,7 @@ export default function Camera() {
           return;
         }
         stream = s;
-        const video = videoRef.current;
+        const video = videoElement;
         if (video) {
           video.srcObject = s;
           try {
@@ -58,39 +58,49 @@ export default function Camera() {
           } catch {
             // jsdom / autoplay: el vídeo arranca igualmente con autoPlay.
           }
+          if (!cancelled) {
+            recognizer = new MediaPipeSignRecognizer(video);
+            unsubscribeSign = recognizer.onSign(({ code }) => {
+              const phrase = phrasesRef.current?.find((p) => p.code === code);
+              if (!phrase) return;
+              setLastSign(phrase.text_es);
+              void speechService.speak({ code: phrase.code, text: phrase.text_es });
+            });
+            unsubscribeStatus = recognizer.onStatus((status) => setRecognition(status));
+            void recognizer.start();
+          }
         }
         setCam({ kind: 'ready' });
         // Con el permiso concedido, las etiquetas de los dispositivos ya son legibles.
-        setCameras(await listCameras());
+        const devices = await listCameras();
+        if (!cancelled) setCameras(devices);
       })
       .catch((e: unknown) => {
         if (!cancelled) setCam({ kind: 'error', key: cameraErrorKey(e) });
       });
     return () => {
       cancelled = true;
+      unsubscribeSign?.();
+      unsubscribeStatus?.();
+      recognizer?.stop();
+      if (videoElement?.srcObject === stream) videoElement.srcObject = null;
       stream?.getTracks().forEach((tr) => tr.stop());
     };
   }, [cameraId, attempt]);
 
-  useEffect(() => {
-    const off = recognizerApi.onSign(({ code }) => {
-      const phrase = phrasesRef.current?.find((p) => p.code === code);
-      if (!phrase) return;
-      setLastSign(phrase.text_es);
-      void speechService.speak({ code: phrase.code, text: phrase.text_es });
-    });
-    void recognizerApi.start();
-    return () => {
-      off();
-      recognizerApi.stop();
-    };
-  }, [recognizerApi]);
-
-  const retry = () => {
+  const retry = (): void => {
     setCam({ kind: 'starting' });
+    setRecognition(null);
     setAttempt((a) => a + 1);
   };
-  const next = phrases && phrases.length > 0 ? phrases[debugIndex % phrases.length] : undefined;
+  const visionMessage =
+    recognition?.phase === 'error'
+      ? t('camera.visionError')
+      : recognition?.phase === 'initializing'
+        ? t('camera.visionStarting')
+        : !recognition?.modelAvailable
+          ? t(recognition?.handsDetected ? 'camera.handsWithoutModel' : 'camera.modelUnavailable')
+          : t(recognition?.handsDetected ? 'camera.handsDetected' : 'camera.searchingHands');
 
   return (
     <div className={styles.cameraWrap}>
@@ -105,7 +115,7 @@ export default function Camera() {
           ) : cam.kind === 'starting' ? (
             <span role="status">{t('camera.starting')}</span>
           ) : (
-            t('camera.comingSoon')
+            <span role="status">{visionMessage}</span>
           )}
         </div>
 
@@ -121,6 +131,7 @@ export default function Camera() {
                 value={cameraId ?? ''}
                 onChange={(e) => {
                   setCam({ kind: 'starting' });
+                  setRecognition(null);
                   setCameraId(e.target.value || null);
                 }}
               >
@@ -132,19 +143,6 @@ export default function Camera() {
                 ))}
               </select>
             </label>
-          ) : null}
-          {next ? (
-            <div className={styles.debug}>
-              <p className={styles.debugTitle}>{t('camera.debugTitle')}</p>
-              <Button
-                variant="secondary"
-                label={t('camera.debugSimulate', { text: next.text_es })}
-                onClick={() => {
-                  recognizer.simulate(next.code);
-                  setDebugIndex((i) => i + 1);
-                }}
-              />
-            </div>
           ) : null}
         </div>
       </div>

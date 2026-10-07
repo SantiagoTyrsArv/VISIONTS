@@ -16,10 +16,12 @@ export const es = {
   'auth.register.submit': 'Registrarme',
   'auth.register.toLogin': '¿Ya tienes cuenta? Inicia sesión',
   'auth.forgot.title': 'Recuperar contraseña',
-  'auth.forgot.hint': 'Escribe tu correo y te enviaremos instrucciones para restablecer tu contraseña.',
+  'auth.forgot.hint':
+    'Escribe tu correo y te enviaremos instrucciones para restablecer tu contraseña.',
   'auth.forgot.submit': 'Enviar instrucciones',
   'auth.forgot.sentTitle': 'Revisa tu correo',
-  'auth.forgot.sentBody': 'Si hay una cuenta asociada a este correo, recibirás un enlace para restablecer tu contraseña en:',
+  'auth.forgot.sentBody':
+    'Si hay una cuenta asociada a este correo, recibirás un enlace para restablecer tu contraseña en:',
   'auth.forgot.backToLogin': 'Volver al inicio de sesión',
   'auth.loading': 'Un momento…',
 
@@ -58,9 +60,13 @@ export const es = {
   'camera.error': 'No se pudo iniciar la cámara.',
   'camera.retry': 'Reintentar',
   'camera.select': 'Cámara',
-  'camera.comingSoon': 'Reconocimiento de señas: próximamente',
-  'camera.debugTitle': 'Depuración',
-  'camera.debugSimulate': 'Simular seña: {text}',
+  'camera.visionStarting': 'Iniciando detección de manos…',
+  'camera.searchingHands': 'Buscando manos…',
+  'camera.handsDetected': 'Manos detectadas',
+  'camera.modelUnavailable': 'Detector activo. Falta un modelo entrenado para reconocer señas.',
+  'camera.handsWithoutModel':
+    'Manos detectadas. Falta un modelo entrenado para reconocer las señas.',
+  'camera.visionError': 'No se pudo iniciar la detección de manos.',
   'camera.signDetected': 'Seña detectada: {text}',
 
   'settings.title': 'Ajustes',
