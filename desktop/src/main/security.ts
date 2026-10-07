@@ -11,11 +11,14 @@ export function isTrustedOrigin(url: string, devUrl: string | undefined): boolea
   }
 }
 
-/** Solo la cámara (permiso "media") y solo para la propia app. */
+/** Cámara ("media") y elección de salida de audio (setSinkId), solo para la propia app. */
 export function allowPermission(
   permission: string,
   requestingUrl: string,
   devUrl: string | undefined,
 ): boolean {
-  return permission === 'media' && isTrustedOrigin(requestingUrl, devUrl);
+  return (
+    (permission === 'media' || permission === 'speaker-selection') &&
+    isTrustedOrigin(requestingUrl, devUrl)
+  );
 }
