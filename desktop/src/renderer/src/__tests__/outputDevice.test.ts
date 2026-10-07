@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  findCable,
-  listOutputDevices,
-  resolveMeetingOutput,
-} from '@/services/audio/outputDevice';
+import { findCable, listOutputDevices, resolveMeetingOutput } from '@/services/audio/outputDevice';
 import { useMeeting } from '@/store/meeting';
 
 const cable = { id: 'c1', label: 'CABLE Input (VB-Audio Virtual Cable)' };

@@ -45,7 +45,11 @@ describe('ttsService', () => {
     const { deps, run } = fakeDeps();
     const [r] = await createTtsService(deps).synthesize([item]);
     expect(r).toMatchObject({ ok: true });
-    expect(Buffer.from((r as { wav: ArrayBuffer }).wav).subarray(0, 4).toString()).toBe('RIFF');
+    expect(
+      Buffer.from((r as { wav: ArrayBuffer }).wav)
+        .subarray(0, 4)
+        .toString(),
+    ).toBe('RIFF');
     expect(run).toHaveBeenCalledTimes(1);
   });
 

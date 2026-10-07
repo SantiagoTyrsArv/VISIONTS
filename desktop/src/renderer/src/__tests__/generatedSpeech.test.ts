@@ -11,7 +11,7 @@ function fakeAudio(sinkError?: Error) {
     src: '',
     volume: 1,
     onended: null as null | (() => void),
-    setSinkId: vi.fn(async (_id: string) => {
+    setSinkId: vi.fn(async () => {
       if (sinkError) throw sinkError;
     }),
     play: vi.fn(async () => {}),
@@ -19,7 +19,10 @@ function fakeAudio(sinkError?: Error) {
   };
 }
 
-function setup(route: Partial<SpeechRoute> = {}, { ok = true, sinkError = undefined as Error | undefined } = {}) {
+function setup(
+  route: Partial<SpeechRoute> = {},
+  { ok = true, sinkError = undefined as Error | undefined } = {},
+) {
   const audios: ReturnType<typeof fakeAudio>[] = [];
   const deps = {
     synthesize: vi.fn(async (items: { text: string }[]) =>

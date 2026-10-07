@@ -42,7 +42,8 @@ export const useSettings = create<SettingsState>()(
       // v0 guardaba `voiceURI` de Chromium, que no sirve para las voces de Windows: se descarta.
       version: 1,
       migrate: (persisted) => {
-        const { voiceURI: _dropped, ...rest } = (persisted ?? {}) as Record<string, unknown>;
+        const rest = { ...(persisted as Record<string, unknown> | undefined) };
+        delete rest.voiceURI;
         return { ...rest, voiceId: null } as unknown as SettingsState;
       },
     },

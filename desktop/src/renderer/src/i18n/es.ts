@@ -56,7 +56,8 @@ export const es = {
     'Windows bloqueó el acceso a la cámara. Actívalo en Configuración › Privacidad › Cámara y vuelve a intentarlo.',
   'camera.starting': 'Iniciando cámara…',
   'camera.noCamera': 'No se encontró ninguna cámara. Conecta una webcam y vuelve a intentarlo.',
-  'camera.inUse': 'La cámara está en uso por otra aplicación. Ciérrala y vuelve a intentarlo.',
+  'camera.inUse':
+    'La cámara está en uso por otra aplicación y no admite dos a la vez. Si tu versión de Windows lo ofrece, activa el uso compartido en Configuración › Bluetooth y dispositivos › Cámaras; si no, elige otra cámara.',
   'camera.error': 'No se pudo iniciar la cámara.',
   'camera.retry': 'Reintentar',
   'camera.select': 'Cámara',

@@ -8,7 +8,7 @@ import { usePlayback } from '@/store/playback';
 import { useSettings } from '@/store/settings';
 import { installFakeSenavoz } from '@/test/fakeSenavoz';
 
-const warm = vi.fn(async (_texts: string[]) => {});
+const warm = vi.fn(async (texts: string[]) => void texts);
 vi.mock('@/services/speech', () => ({ speechService: { warm: (t: string[]) => warm(t) } }));
 vi.mock('@/api/endpoints', () => ({
   phrasesApi: {
