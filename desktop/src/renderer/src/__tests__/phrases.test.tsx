@@ -4,10 +4,12 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Phrases from '@/routes/Phrases';
+import { usePlayback } from '@/store/playback';
 
 const speak = vi.fn();
+const stop = vi.fn();
 vi.mock('@/services/speech', () => ({
-  speechService: { speak: (...a: unknown[]) => speak(...a), stop: vi.fn() },
+  speechService: { speak: (...a: unknown[]) => speak(...a), stop: () => stop() },
 }));
 const list = vi.fn();
 vi.mock('@/api/endpoints', () => ({ phrasesApi: { list: () => list() } }));
@@ -23,6 +25,8 @@ function renderScreen() {
 
 beforeEach(() => {
   speak.mockReset();
+  stop.mockReset();
+  usePlayback.setState({ lastText: null, playing: false });
   list.mockReset();
 });
 
@@ -50,5 +54,20 @@ describe('pantalla de frases', () => {
     expect(await screen.findByText('No se pudieron cargar las frases')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
     expect(list).toHaveBeenCalledTimes(2);
+  });
+
+  it('la franja "Sonando ahora" muestra la última frase y Detener la corta', async () => {
+    list.mockResolvedValue([{ id: '1', code: 'hello', text_es: 'Hola', is_default: true }]);
+    usePlayback.setState({ lastText: 'Hola', playing: true });
+    renderScreen();
+    expect(await screen.findByText('Sonando ahora')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Detener' }));
+    expect(stop).toHaveBeenCalled();
+  });
+
+  it('indica que fuera del Modo reunión suena por los altavoces', async () => {
+    list.mockResolvedValue([]);
+    renderScreen();
+    expect(await screen.findByText('Altavoces')).toBeInTheDocument();
   });
 });
