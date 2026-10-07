@@ -73,7 +73,7 @@ Nota: el límite de peticiones usa la memoria del proceso. Con varios workers o 
 ```bash
 cd desktop
 npm install
-cp .env.example .env        # RENDERER_VITE_API_URL (por defecto http://localhost:8000)
+cp .env.example .env        # opcional: RENDERER_VITE_API_URL (sin .env se usa http://localhost:8000)
 npm run dev                 # app en modo desarrollo con recarga en caliente
 npm run build:win           # instalador en desktop/release/SenaVoz-Setup-<versión>.exe
 ```
@@ -124,11 +124,16 @@ npm run typecheck     # tsc para main/preload y renderer
 - `session.bin` está cifrado: no aparece ningún token en claro.
 - Modo desarrollo (servidor de Vite con HMR): la UI carga bajo la CSP sin errores.
 - Para esta entrega, 18 tests del reconocimiento pasan; `npm run build` y TypeScript pasan, y el artefacto incluye el modelo Hand Landmarker y los WASM locales.
+- Revisión del 6/10/2026 sobre `win-unpacked/SenaVoz.exe` (instalador de 123 MB):
+  - cerrar sesión e iniciarla desde el formulario, las 9 frases y el atajo 1 con voz en español;
+  - webcam real (1280×720) con MediaPipe cargando su WASM por `app://`;
+  - con el backend apagado, el login muestra "No se pudo conectar con el servidor";
+  - la telemetría que MediaPipe intenta enviar a Google la bloquea la CSP;
+  - los 91 tests del escritorio y los 22 del backend pasan, y el lint queda sin errores.
 
 **No verificado:**
 
 - La detección con una webcam física no se comprobó manualmente en esta sesión. El clasificador semántico y la emisión de voz por predicciones reales requieren un modelo entrenado, que no está disponible en el proyecto.
-- La suite completa del escritorio tiene 3 fallos existentes en `client.test.ts` (88 de 91 tests pasan); no corresponden al reconocimiento de cámara.
 - Que el audio **se oiga** bien: se comprobó que la síntesis se activa, no la calidad del sonido.
 - La ejecución del instalador NSIS (asistente, accesos directos y desinstalación).
 - macOS y Linux, firma de código y auto-update (fuera de alcance).
