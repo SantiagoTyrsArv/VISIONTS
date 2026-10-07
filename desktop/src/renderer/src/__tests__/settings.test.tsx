@@ -5,23 +5,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Settings from '@/routes/Settings';
 import { useSession } from '@/store/session';
 import { useSettings } from '@/store/settings';
-import { voice } from '@/test/fakeSpeech';
+import { installFakeSenavoz } from '@/test/fakeSenavoz';
 
 const speak = vi.fn();
 vi.mock('@/services/speech', () => ({
   speechService: { speak: (...a: unknown[]) => speak(...a), stop: vi.fn() },
 }));
-let voices: SpeechSynthesisVoice[] = [];
-vi.mock('@/services/speech/useSpanishVoices', () => ({ useSpanishVoices: () => voices }));
+const voices = [
+  { id: 'id-helena', name: 'Microsoft Helena', lang: 'es-ES' },
+  { id: 'id-pablo', name: 'Microsoft Pablo', lang: 'es-ES' },
+];
 vi.mock('@/services/camera/camera', () => ({ listCameras: async () => [] }));
 
 const logout = vi.fn(async () => {});
 
 beforeEach(() => {
-  voices = [voice('Helena', 'es-ES', true), voice('Pablo', 'es-ES')];
+  installFakeSenavoz({ voices });
   logout.mockClear();
   speak.mockReset();
-  useSettings.setState({ volume: 1, rate: 1, voiceURI: null, cameraId: null });
+  useSettings.setState({ volume: 1, rate: 1, voiceId: null, cameraId: null });
   useSession.setState({
     status: 'authenticated',
     user: {
@@ -49,16 +51,17 @@ describe('ajustes', () => {
     expect(useSettings.getState()).toMatchObject({ volume: 0.9, rate: 1.25 });
   });
 
-  it('elegir una voz la guarda', async () => {
+  it('lista las voces de Windows y guarda la elegida', async () => {
     render(<Settings />);
-    await userEvent.selectOptions(screen.getByLabelText('Voz del sistema'), 'uri:Pablo');
-    expect(useSettings.getState().voiceURI).toBe('uri:Pablo');
+    await screen.findByRole('option', { name: 'Microsoft Pablo (es-ES)' });
+    await userEvent.selectOptions(screen.getByLabelText('Voz del sistema'), 'id-pablo');
+    expect(useSettings.getState().voiceId).toBe('id-pablo');
   });
 
-  it('sin voces en español lo avisa', () => {
-    voices = [];
+  it('sin voces en español lo avisa', async () => {
+    installFakeSenavoz({ voices: [] });
     render(<Settings />);
-    expect(screen.getByText(/No hay voces en español instaladas/)).toBeInTheDocument();
+    expect(await screen.findByText(/No hay voces en español instaladas/)).toBeInTheDocument();
   });
 
   it('probar voz habla la frase de prueba', async () => {

@@ -4,7 +4,7 @@ import { queryClient } from '@/api/queryClient';
 import { t } from '@/i18n';
 import { listCameras } from '@/services/camera/camera';
 import { speechService } from '@/services/speech';
-import { useSpanishVoices } from '@/services/speech/useSpanishVoices';
+import { useTtsVoices } from '@/services/speech/useTtsVoices';
 import { useSession } from '@/store/session';
 import { useSettings } from '@/store/settings';
 import { Button } from '@/ui/Button';
@@ -62,12 +62,12 @@ function Stepper({
 export default function Settings() {
   const user = useSession((s) => s.user);
   const logout = useSession((s) => s.logout);
-  const { volume, rate, voiceURI, cameraId, setVolume, setRate, setVoiceURI, setCameraId } =
+  const { volume, rate, voiceId, cameraId, setVolume, setRate, setVoiceId, setCameraId } =
     useSettings();
-  const voices = useSpanishVoices();
+  const { voices, loaded } = useTtsVoices();
   const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
   const [loggingOut, setLoggingOut] = useState(false);
-  const voiceId = useId();
+  const voiceSelectId = useId();
   const cameraSelectId = useId();
 
   useEffect(() => {
@@ -93,22 +93,22 @@ export default function Settings() {
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>{t('settings.voice')}</h2>
         <div className={styles.row}>
-          <label htmlFor={voiceId}>{t('settings.voiceName')}</label>
+          <label htmlFor={voiceSelectId}>{t('settings.voiceName')}</label>
           <select
-            id={voiceId}
+            id={voiceSelectId}
             className={styles.select}
-            value={voiceURI ?? ''}
-            onChange={(e) => setVoiceURI(e.target.value || null)}
+            value={voiceId ?? ''}
+            onChange={(e) => setVoiceId(e.target.value || null)}
           >
             <option value="">{t('settings.voiceDefault')}</option>
             {voices.map((v) => (
-              <option key={v.voiceURI} value={v.voiceURI}>
+              <option key={v.id} value={v.id}>
                 {`${v.name} (${v.lang})`}
               </option>
             ))}
           </select>
         </div>
-        {voices.length === 0 ? (
+        {loaded && voices.length === 0 ? (
           <p className={styles.muted}>{t('settings.noSpanishVoice')}</p>
         ) : null}
         <Stepper
