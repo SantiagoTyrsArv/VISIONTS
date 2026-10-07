@@ -1,16 +1,31 @@
 :root {
-  --bg: #0b1220;
-  --surface: #16213a;
+  /* Base: tinta azul profunda; el amarillo "señal" se reserva para lo que habla (frases). */
+  --bg: #0e1626;
+  --surface: #162036;
+  --surface-raised: #1d2944;
+  --border: #2c3b5c;
+  --border-strong: #3e5079;
+  --text: #f3f5fa;
+  --text-muted: #a9b6ce;
   --card: #ffd60a;
-  --card-text: #111827;
-  --text: #ffffff;
-  --text-muted: #b6c2d9;
-  --primary: #4da3ff;
+  --card-press: #f0c400;
+  --card-text: #14120a;
+  --primary: #7cb8ff;
+  --primary-strong: #4da3ff;
   --primary-text: #04121f;
-  --danger: #ff6b6b;
-  --border: #3a4a6b;
+  --danger: #ff7a7a;
+  --danger-bg: rgba(255, 122, 122, 0.12);
+
+  --radius-s: 10px;
+  --radius-m: 14px;
+  --radius-l: 22px;
+
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+  --font-text: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+
   color-scheme: dark;
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font-text);
+  -webkit-font-smoothing: antialiased;
 }
 * {
   box-sizing: border-box;
@@ -25,11 +40,31 @@ body {
   background: var(--bg);
   color: var(--text);
   font-size: 16px;
+  line-height: 1.45;
+}
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
 }
 :focus-visible {
   outline: 3px solid var(--primary);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
-button {
+button,
+input,
+select {
   font: inherit;
+}
+::selection {
+  background: var(--card);
+  color: var(--card-text);
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

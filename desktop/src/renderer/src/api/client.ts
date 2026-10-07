@@ -48,20 +48,33 @@ http.interceptors.response.use(
     }
     original._retried = true;
 
+    let newToken: string;
     try {
       refreshInFlight ??= refreshAccessToken().finally(() => {
         refreshInFlight = null;
       });
-      const newToken = await refreshInFlight;
-      original.headers.set('Authorization', `Bearer ${newToken}`);
-      return await http(original);
-    } catch {
-      await tokenStorage.clear();
-      onAuthFailure();
+      newToken = await refreshInFlight;
+    } catch (refreshError) {
+      // Solo se cierra la sesión si el servidor rechaza las credenciales; ante un
+      // fallo de red o un 5xx se conservan los tokens para reintentar más tarde.
+      if (isCredentialRejection(refreshError)) {
+        await tokenStorage.clear();
+        onAuthFailure();
+      }
       throw error;
     }
+
+    // Un fallo del reintento (p. ej. 500) se propaga tal cual: los tokens nuevos son válidos.
+    original.headers.set('Authorization', `Bearer ${newToken}`);
+    return http(original);
   },
 );
+
+function isCredentialRejection(error: unknown): boolean {
+  if (error instanceof Error && error.message === 'no-refresh-token') return true;
+  const status = apiErrorStatus(error);
+  return status === 401 || status === 403;
+}
 
 /** Código HTTP de un error de axios (undefined si no hubo respuesta). */
 export function apiErrorStatus(error: unknown): number | undefined {

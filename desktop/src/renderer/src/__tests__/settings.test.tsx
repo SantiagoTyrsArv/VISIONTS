@@ -24,7 +24,13 @@ beforeEach(() => {
   useSettings.setState({ volume: 1, rate: 1, voiceURI: null, cameraId: null });
   useSession.setState({
     status: 'authenticated',
-    user: { id: '1', email: 'ana@example.com', display_name: 'Ana', is_active: true, created_at: '' },
+    user: {
+      id: '1',
+      email: 'ana@example.com',
+      display_name: 'Ana',
+      is_active: true,
+      created_at: '',
+    },
     logout,
   });
 });

@@ -108,7 +108,9 @@ export default function Settings() {
             ))}
           </select>
         </div>
-        {voices.length === 0 ? <p className={styles.muted}>{t('settings.noSpanishVoice')}</p> : null}
+        {voices.length === 0 ? (
+          <p className={styles.muted}>{t('settings.noSpanishVoice')}</p>
+        ) : null}
         <Stepper
           label={t('settings.volume')}
           value={volume}

@@ -1,26 +1,49 @@
+/* ---------- Botones ---------- */
 .button {
   min-height: 48px;
-  padding: 0 20px;
+  padding: 0 22px;
   border: 0;
-  border-radius: 12px;
-  font-weight: 700;
-  font-size: 17px;
+  border-radius: var(--radius-m);
+  font-weight: 650;
+  font-size: 16px;
   cursor: pointer;
   background: var(--primary);
   color: var(--primary-text);
+  transition:
+    background-color 0.15s,
+    transform 0.1s;
+}
+.button:hover:not(:disabled) {
+  background: var(--primary-strong);
+}
+.button:active:not(:disabled) {
+  transform: translateY(1px);
 }
 .secondary {
-  background: var(--border);
+  background: var(--surface-raised);
   color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.secondary:hover:not(:disabled) {
+  background: var(--border);
 }
 .danger {
-  background: var(--danger);
-  color: var(--primary-text);
+  background: transparent;
+  color: var(--danger);
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
+.danger:hover:not(:disabled) {
+  background: var(--danger-bg);
 }
 .button:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: default;
 }
+.button[aria-busy='true'] {
+  cursor: progress;
+}
+
+/* ---------- Campos ---------- */
 .field {
   display: flex;
   flex-direction: column;
@@ -29,15 +52,28 @@
 .label {
   color: var(--text-muted);
   font-weight: 600;
+  font-size: 15px;
 }
 .input {
+  width: 100%;
   min-height: 48px;
   padding: 0 14px;
-  border-radius: 12px;
-  border: 2px solid var(--border);
-  background: var(--surface);
+  border-radius: var(--radius-s);
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
   color: var(--text);
   font-size: 17px;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.input:hover {
+  border-color: var(--text-muted);
+}
+.input:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(124, 184, 255, 0.3);
 }
 .input[aria-invalid='true'] {
   border-color: var(--danger);
@@ -49,16 +85,16 @@
 }
 .inputWrap .input {
   width: 100%;
-  padding-right: 48px;
+  padding-right: 52px;
 }
 .eyeBtn {
   position: absolute;
-  right: 10px;
+  right: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border: 0;
   border-radius: 8px;
@@ -77,56 +113,103 @@
 .fieldError {
   color: var(--danger);
   font-weight: 600;
+  font-size: 14px;
 }
+
+/* ---------- Pantallas de acceso ---------- */
 .auth {
   min-height: 100%;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 32px 16px;
 }
 .authBox {
-  width: min(420px, 100%);
+  width: min(440px, 100%);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
+  padding: 36px 36px 28px;
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
+/* Logotipo: la "ñ" del nombre es el gesto de la marca; se compone como una placa amarilla. */
 .brand {
-  color: var(--card);
-  font-size: 40px;
-  font-weight: 900;
-  margin: 0;
+  align-self: flex-start;
+  margin: 0 0 6px;
+  padding: 4px 14px 6px;
+  border-radius: var(--radius-s);
+  background: var(--card);
+  color: var(--card-text);
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 .title {
-  font-size: 24px;
-  margin: 0 0 8px;
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin: 0;
 }
 .splash {
   height: 100%;
   display: grid;
   place-items: center;
   color: var(--text-muted);
+  font-size: 18px;
 }
+
+/* ---------- Tarjeta de frase: el elemento protagonista ---------- */
 .card {
   position: relative;
-  min-height: 130px;
-  padding: 16px;
+  display: flex;
+  align-items: flex-end;
+  min-height: 148px;
+  padding: 20px 20px 18px;
   border: 0;
-  border-radius: 18px;
+  border-radius: var(--radius-l);
   background: var(--card);
   color: var(--card-text);
-  font-size: 24px;
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 750;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  text-align: left;
   cursor: pointer;
+  box-shadow: 0 4px 0 var(--card-press);
+  transition:
+    transform 0.08s,
+    box-shadow 0.08s,
+    background-color 0.15s;
+}
+.card:hover {
+  background: #ffdc2e;
 }
 .card:active {
-  transform: scale(0.97);
-  opacity: 0.8;
+  transform: translateY(4px);
+  box-shadow: 0 0 0 var(--card-press);
+  background: var(--card-press);
 }
+.card:focus-visible {
+  outline: 3px solid var(--text);
+  outline-offset: 4px;
+}
+/* Atajo de teclado dibujado como una tecla. */
 .shortcut {
   position: absolute;
-  top: 8px;
-  left: 12px;
+  top: 14px;
+  right: 14px;
+  min-width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  border: 1.5px solid rgba(20, 18, 10, 0.35);
+  border-bottom-width: 3px;
+  font-family: var(--font-text);
   font-size: 14px;
   font-weight: 700;
-  opacity: 0.6;
+  color: rgba(20, 18, 10, 0.7);
 }

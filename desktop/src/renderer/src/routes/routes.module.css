@@ -1,25 +1,36 @@
+/* ---------- Formularios de acceso ---------- */
 .form {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 .error {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-s);
+  background: var(--danger-bg);
   color: var(--danger);
   font-weight: 600;
-  margin: 0;
 }
 .link {
   color: var(--primary);
   text-align: center;
-  padding: 12px;
-  font-size: 17px;
+  padding: 10px;
+  font-size: 16px;
+  text-decoration: none;
+}
+.link:hover {
+  text-decoration: underline;
 }
 .linkSmall {
+  align-self: flex-end;
   color: var(--primary);
   font-size: 14px;
-  text-align: right;
   padding: 2px 0;
-  opacity: 0.85;
+  text-decoration: none;
+}
+.linkSmall:hover {
+  text-decoration: underline;
 }
 .forgotHint {
   color: var(--text-muted);
@@ -52,70 +63,109 @@
   margin: 0;
   word-break: break-all;
 }
+
+/* ---------- Estructura de la app ---------- */
 .shell {
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 232px 1fr;
   height: 100%;
 }
 .sidebar {
   background: var(--surface);
-  padding: 24px 12px;
+  border-right: 1px solid var(--border);
+  padding: 24px 14px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 .sidebarBrand {
-  color: var(--card);
-  font-size: 26px;
-  font-weight: 900;
-  padding: 0 12px 16px;
-  margin: 0;
+  align-self: flex-start;
+  margin: 0 0 22px 10px;
+  padding: 2px 10px 4px;
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--card-text);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 .navLink {
-  color: var(--text);
+  position: relative;
+  color: var(--text-muted);
   text-decoration: none;
-  padding: 12px;
-  border-radius: 10px;
+  padding: 11px 14px;
+  border-radius: var(--radius-s);
   font-weight: 600;
-  font-size: 17px;
+  font-size: 16px;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
+.navLink:hover {
+  color: var(--text);
+  background: var(--surface-raised);
+}
+/* La página actual se marca con la barra amarilla de la marca. */
 .navLink[aria-current='page'] {
-  background: var(--border);
+  color: var(--text);
+  background: var(--surface-raised);
+}
+.navLink[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  left: -14px;
+  top: 8px;
+  bottom: 8px;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--card);
 }
 .content {
   overflow: auto;
-  padding: 28px;
+  padding: 32px 36px;
 }
 .title {
-  font-size: 28px;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
   margin: 0;
 }
 .hint {
   color: var(--text-muted);
-  margin: 6px 0 20px;
+  margin: 6px 0 24px;
+  max-width: 60ch;
 }
+
+/* ---------- Frases ---------- */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 16px;
+  padding-bottom: 8px;
 }
 .center {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 16px;
-  padding: 40px;
+  padding: 48px 24px;
+  color: var(--text-muted);
 }
 .errorText {
   color: var(--danger);
   font-size: 18px;
+  margin: 0;
 }
+
+/* ---------- Cámara ---------- */
 .cameraWrap {
   position: relative;
-  height: calc(100vh - 56px);
-  border-radius: 18px;
+  height: calc(100vh - 64px);
+  border-radius: var(--radius-l);
   overflow: hidden;
   background: #000;
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 .video {
   width: 100%;
@@ -129,7 +179,7 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 16px;
+  padding: 18px;
   pointer-events: none;
 }
 .overlay > * {
@@ -137,19 +187,25 @@
 }
 .banner {
   align-self: center;
-  background: rgba(11, 18, 32, 0.85);
-  border-radius: 14px;
-  padding: 12px 18px;
-  color: var(--card);
-  font-size: 18px;
-  font-weight: 800;
+  background: rgba(14, 22, 38, 0.82);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 10px 20px;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
   text-align: center;
   max-width: 560px;
+}
+.banner:has([role='alert']) {
+  border-radius: var(--radius-l);
+  padding: 16px 20px;
 }
 .cameraError {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   align-items: center;
   color: var(--text);
 }
@@ -159,56 +215,70 @@
 .bottom {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 12px;
 }
+/* Lo que se acaba de decir en voz alta: misma placa amarilla que las frases. */
 .detected {
   background: var(--card);
   color: var(--card-text);
-  font-size: 20px;
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 750;
   text-align: center;
-  padding: 12px;
-  border-radius: 12px;
+  padding: 14px 28px;
+  border-radius: var(--radius-l);
   margin: 0;
+  max-width: 720px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 .debug {
-  background: rgba(11, 18, 32, 0.85);
-  border-radius: 14px;
-  padding: 12px;
+  align-self: flex-end;
+  background: rgba(14, 22, 38, 0.82);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  padding: 10px 12px;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
 }
 .debugTitle {
   color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
+  font-size: 14px;
+  font-weight: 600;
   margin: 0;
 }
+
+/* ---------- Ajustes ---------- */
 .select {
   min-height: 44px;
-  border-radius: 10px;
-  background: var(--surface);
+  max-width: 340px;
+  border-radius: var(--radius-s);
+  background: var(--bg);
   color: var(--text);
-  border: 2px solid var(--border);
-  padding: 0 10px;
-  font-size: 16px;
+  border: 1px solid var(--border-strong);
+  padding: 0 12px;
+  font-size: 15px;
+  cursor: pointer;
+}
+.select:hover {
+  border-color: var(--text-muted);
 }
 .section {
   background: var(--surface);
-  border-radius: 16px;
-  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  padding: 22px 24px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  max-width: 640px;
+  gap: 16px;
+  max-width: 680px;
 }
 .sectionTitle {
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 650;
   margin: 0;
 }
 .name {
@@ -220,32 +290,46 @@
   color: var(--text-muted);
   margin: 0;
 }
+.section .name + .muted {
+  margin-top: -12px;
+}
 .row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
+  min-height: 48px;
 }
 .stepper {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-m);
+  background: var(--bg);
+  border: 1px solid var(--border);
 }
 .stepBtn {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-s);
   border: 0;
-  background: var(--border);
+  background: transparent;
   color: var(--text);
-  font-size: 26px;
-  font-weight: 700;
+  font-size: 22px;
+  font-weight: 600;
   cursor: pointer;
+  transition: background-color 0.15s;
+}
+.stepBtn:hover {
+  background: var(--surface-raised);
 }
 .value {
   min-width: 64px;
   text-align: center;
-  font-size: 18px;
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .stack {
   display: flex;
@@ -253,7 +337,7 @@
   gap: 20px;
 }
 .actions {
-  max-width: 640px;
+  max-width: 680px;
   display: flex;
   flex-direction: column;
 }
