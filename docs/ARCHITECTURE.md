@@ -8,7 +8,7 @@ flowchart LR
     subgraph Renderer["Renderer (React)"]
       Cam["getUserMedia\n(webcam)"]
       Rec["MediaPipe Hand Landmarker\n(landmarks locales · clasificador pendiente)"]
-      Speech["SpeechService\n(Web Speech · F4: audio cacheado + setSinkId)"]
+      Speech["SpeechService\n(voces de Windows + setSinkId)"]
       UI["React Router\nZustand + TanStack Query"]
       Cam --> Rec --> Speech
       UI --> Speech
@@ -32,7 +32,7 @@ flowchart LR
   UI -- "HTTPS + JWT" --> API
   Rec -. "F2: secuencias de landmarks (futuro)" .-> API
   API -. "F3: modelo entrenado" .-> Rec
-  Speech -. "F4: setSinkId" .-> VCable --> Meet
+  Speech -- "setSinkId" --> VCable --> Meet
 ```
 
 Las líneas punteadas son fases futuras; el MVP implementa las sólidas.
@@ -106,9 +106,9 @@ El artefacto de detección de manos incluido es el modelo oficial [Hand Landmark
 
 **Entrenamiento en servidor.** Una red LSTM/GRU pequeña conviene entrenarla en lote. El servidor recibe muestras, entrena, evalúa y exporta un modelo versionado que la app descarga. Así el ciclo de mejora del modelo va separado del de publicación de la app.
 
-**TTS pregenerado/cacheado.** Las frases son un conjunto cerrado y pequeño. Se pueden pregenerar con una voz de más calidad que la del sistema y reproducirlas localmente. `SpeechService` ya abstrae esto: hoy usa `WebSpeechService` (voces del sistema), y `CachedAudioSpeechService` ya reproduce un audio local por `code` y cae al TTS si no hay audio.
+**TTS pregenerado/cacheado.** Las frases son un conjunto cerrado y pequeño. Se pueden pregenerar con una voz de más calidad que la del sistema y reproducirlas localmente. `SpeechService` lo abstrae: `GeneratedSpeechService` reproduce el audio generado con las voces de Windows (precargado para todo el catálogo) y, solo fuera del Modo reunión, cae a `WebSpeechService` si la síntesis falla.
 
-**Audio hacia la reunión.** `speechSynthesis` no permite elegir el dispositivo de salida, así que la voz del sistema no puede ir al cable virtual. En la Fase 4 se usarán audios pregenerados reproducidos con `HTMLAudioElement.setSinkId()` hacia el dispositivo virtual (VB-Cable), que la reunión usa como micrófono.
+**Audio hacia la reunión (Modo reunión).** El main genera WAV con las voces OneCore de Windows (`resources/tts/synth.ps1`, WinRT vía PowerShell) y los guarda en `userData/tts-cache/` por voz + velocidad + texto. El renderer los reproduce con `HTMLAudioElement.setSinkId()` hacia VB-Cable ("CABLE Input"), que la reunión usa como micrófono ("CABLE Output"). En Modo reunión la voz nunca sale por los altavoces. La ventana se vuelve compacta y siempre visible, y Ctrl+Alt+1…9 funcionan con la reunión enfocada. Spec: `docs/superpowers/specs/2026-10-07-meeting-mode-design.md`.
 
 **Interfaces desacopladas.** `SignRecognizer` y `SpeechService` son el contrato entre la UI y las capacidades cambiantes. `MediaPipeSignRecognizer` implementa la detección de manos y admite un clasificador temporal opcional; la pantalla de cámara no depende directamente de MediaPipe.
 
@@ -128,7 +128,6 @@ El artefacto de detección de manos incluido es el modelo oficial [Hand Landmark
 - Registro en `ml_models` y endpoint de descarga.
 - Inferencia en el renderer implementando `SignRecognizer` sin tocar la UI. **Dirección, no decisión:** TF.js u ONNX Runtime Web.
 
-### Fase 4 — Voz hacia la reunión
+### Modo reunión — hecho
 
-- Audios pregenerados/cacheados por frase.
-- Selección del dispositivo de salida (`setSinkId`) hacia el cable de audio virtual enrutado como micrófono de la reunión.
+Ver la spec `docs/superpowers/specs/2026-10-07-meeting-mode-design.md` y el plan `docs/superpowers/plans/2026-10-07-meeting-mode.md`.

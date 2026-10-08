@@ -1,6 +1,6 @@
 # SeñaVoz
 
-App de escritorio (Windows) para traducir señas a voz. Incluye autenticación, catálogo de frases, reproducción de voz y detección local de manos con MediaPipe. La traducción de señas requiere un modelo semántico entrenado, que aún no está incluido; la salida de voz hacia reuniones también está pendiente (ver [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
+App de escritorio (Windows) para traducir señas a voz. Incluye autenticación, catálogo de frases, reproducción de voz y detección local de manos con MediaPipe. La traducción de señas requiere un modelo semántico entrenado, que aún no está incluido; la voz llega a cualquier app de reuniones (Zoom, Teams, Meet…) a través del **Modo reunión** (ver [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
 
 ```
 senavoz/
@@ -85,14 +85,20 @@ npm run build:win           # instalador en desktop/release/SenaVoz-Setup-<versi
 1. Regístrate (entras directamente) o inicia sesión. La sesión se mantiene al cerrar y reabrir la app.
 2. **Frases**: haz clic en una tarjeta (o pulsa Enter/Espacio) y se reproduce en voz. **Atajos 1–9** para las nueve primeras frases; no se disparan mientras escribes ni con Ctrl/Alt.
 3. **Cámara**: vista de la webcam en espejo; MediaPipe detecta hasta dos manos y muestra su estado. La app empaqueta el runtime WASM y el modelo de detección, por lo que no necesita descargar esos archivos al iniciarse. Para traducir una seña a una frase y voz todavía hace falta configurar un clasificador entrenado. Si hay varias webcams aparece un selector; los errores de permiso y cámara mantienen su mensaje específico y opción "Reintentar".
-4. **Ajustes**: perfil, voz del sistema (voces `es-*` instaladas), volumen, velocidad, cámara preferida (si se desenchufa, se usa la predeterminada) y **Cerrar sesión**, que revoca el refresh token en el servidor.
+4. **Ajustes**: sección **Reunión** (detección de VB-Cable, salida y prueba por el cable), voz de Windows (voces `es-*` instaladas), volumen, velocidad, cámara preferida (si se desenchufa, se usa la predeterminada) y **Cerrar sesión**, que revoca el refresh token en el servidor.
+
+### Usar SeñaVoz en una reunión
+
+1. Instala [VB-Cable](https://vb-audio.com/Cable/) (como administrador) y reinicia. SeñaVoz lo detecta en Ajustes › Reunión.
+2. En Zoom, Teams o Meet elige **CABLE Output** como micrófono (una sola vez por app).
+3. En SeñaVoz pulsa **Modo reunión**: la ventana se vuelve compacta y queda encima. Con la reunión enfocada, **Ctrl+Alt+1…9** dicen las frases 1–9. En este modo la voz nunca sale por los altavoces.
 
 ### Seguridad
 
 - Los tokens solo se guardan **cifrados con `safeStorage` (DPAPI de Windows)** en `%APPDATA%\SeñaVoz\session.bin`, desde el proceso main. Si el cifrado no está disponible, la sesión no se guarda (nunca en claro). Las preferencias no sensibles van a `localStorage`.
-- `contextIsolation` + `sandbox` activados y `nodeIntegration` desactivado. El preload solo expone `window.senavoz.tokens.{get, save, clear}`.
+- `contextIsolation` + `sandbox` activados y `nodeIntegration` desactivado. El preload expone `window.senavoz.tokens`, `tts` (voces, síntesis y poda de caché) y `meeting` (entrar, salir y atajos). Los textos a sintetizar llegan a PowerShell por stdin, nunca como argumentos.
 - La UI se sirve desde el protocolo propio `app://senavoz`, que solo entrega archivos de la carpeta de la UI. La CSP limita `connect-src` a la API.
-- Solo se concede el permiso de cámara a la propia app. La navegación externa y `window.open` están bloqueados.
+- Solo se conceden a la propia app los permisos de cámara y de elección de salida de audio (`setSinkId`). La navegación externa y `window.open` están bloqueados.
 
 ## Tests
 
@@ -140,7 +146,7 @@ npm run typecheck     # tsc para main/preload y renderer
 
 ## Decisiones de dependencias
 
-- **Electron + electron-vite + React/TypeScript**: reutiliza la lógica TS del MVP móvil (cliente con refresh, stores, i18n). `@mediapipe/tasks-vision` corre en el renderer sin código nativo; detección de manos disponible, clasificador semántico pendiente. `setSinkId` queda para la Fase 4.
+- **Electron + electron-vite + React/TypeScript**: reutiliza la lógica TS del MVP móvil (cliente con refresh, stores, i18n). `@mediapipe/tasks-vision` corre en el renderer sin código nativo; detección de manos disponible, clasificador semántico pendiente. La voz se genera con las voces OneCore de Windows (WinRT vía PowerShell) y se envía con `setSinkId`.
 - **Vite 7** (no 8) y **TypeScript 5.9**: son las versiones que admite electron-vite 5 y su tsconfig base.
 - **react-router** con `HashRouter` (funciona igual bajo `app://` y en desarrollo), **Zustand**, **TanStack Query**, **react-hook-form + zod 4**.
 - **Vitest** con dos proyectos (main en Node y renderer en jsdom). La lógica del main se escribe con dependencias inyectadas para testearla sin Electron.
