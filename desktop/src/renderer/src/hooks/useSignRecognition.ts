@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 
-import type { TranslationKey } from '@/i18n';
+import { t, type TranslationKey } from '@/i18n';
 import {
   cameraErrorKey,
   listCameras,
@@ -8,8 +8,9 @@ import {
   type CameraErrorKey,
 } from '@/services/camera/camera';
 import { MediaPipeSignRecognizer } from '@/services/recognition/MediaPipeSignRecognizer';
-import type { RecognitionStatus } from '@/services/recognition/SignRecognizer';
+import type { LandmarkFrame, RecognitionStatus } from '@/services/recognition/SignRecognizer';
 import { useSettings } from '@/store/settings';
+import { isTraining, useSignModel } from '@/store/signModel';
 
 export type CamState =
   { kind: 'starting' } | { kind: 'ready' } | { kind: 'error'; key: CameraErrorKey };
@@ -23,6 +24,28 @@ export function visionMessageKey(recognition: RecognitionStatus | null): Transla
   return recognition.handsDetected ? 'camera.handsDetected' : 'camera.searchingHands';
 }
 
+type ModelView = {
+  status: 'unknown' | 'none' | 'ready' | 'error';
+  metrics: { val_accuracy: number } | null;
+  job: Parameters<typeof isTraining>[0];
+};
+
+/** Texto del estado del modelo de señas para los paneles de Cámara y Reunión. */
+export function modelStatusText(model: ModelView): string {
+  if (isTraining(model.job)) return t('camera.modelTraining');
+  if (model.status === 'ready' && model.metrics) {
+    return t('camera.modelReady', { pct: String(Math.round(model.metrics.val_accuracy * 100)) });
+  }
+  if (model.status === 'error') return t('camera.modelError');
+  return t('camera.modelNo');
+}
+
+export type SignRecognitionOptions = {
+  /** false en la pantalla Entrenar: solo se necesitan los frames. */
+  classify?: boolean;
+  onFrame?: (frame: LandmarkFrame) => void;
+};
+
 /**
  * Webcam + reconocedor de señas sobre un <video>. Lo usan la pantalla Cámara y la de
  * reunión; solo una está montada a la vez, así que hay una sola cámara abierta.
@@ -30,6 +53,7 @@ export function visionMessageKey(recognition: RecognitionStatus | null): Transla
 export function useSignRecognition(
   videoRef: RefObject<HTMLVideoElement | null>,
   onSign: (code: string) => void,
+  options: SignRecognitionOptions = {},
 ) {
   const cameraId = useSettings((s) => s.cameraId);
   const setCameraId = useSettings((s) => s.setCameraId);
@@ -44,12 +68,29 @@ export function useSignRecognition(
     onSignRef.current = onSign;
   });
 
+  const classify = options.classify ?? true;
+  const modelClassifier = useSignModel((s) => s.classifier);
+  const classifier = classify ? modelClassifier : null;
+  const classifierRef = useRef(classifier);
+  const onFrameRef = useRef(options.onFrame);
+  useEffect(() => {
+    onFrameRef.current = options.onFrame;
+  });
+  const recognizerRef = useRef<MediaPipeSignRecognizer | null>(null);
+
+  // Un modelo nuevo (p. ej. tras entrenar) se aplica sin reiniciar la cámara.
+  useEffect(() => {
+    classifierRef.current = classifier;
+    recognizerRef.current?.setClassifier(classifier);
+  }, [classifier]);
+
   useEffect(() => {
     const videoElement = videoRef.current;
     let stream: MediaStream | null = null;
     let recognizer: MediaPipeSignRecognizer | null = null;
     let unsubscribeSign: (() => void) | null = null;
     let unsubscribeStatus: (() => void) | null = null;
+    let unsubscribeFrame: (() => void) | null = null;
     let cancelled = false;
     openCamera(cameraId)
       .then(async (s) => {
@@ -66,9 +107,13 @@ export function useSignRecognition(
             // jsdom / autoplay: el vídeo arranca igualmente con autoPlay.
           }
           if (!cancelled) {
-            recognizer = new MediaPipeSignRecognizer(videoElement);
+            recognizer = new MediaPipeSignRecognizer(videoElement, {
+              classifier: classifierRef.current,
+            });
+            recognizerRef.current = recognizer;
             unsubscribeSign = recognizer.onSign(({ code }) => onSignRef.current(code));
             unsubscribeStatus = recognizer.onStatus((status) => setRecognition(status));
+            unsubscribeFrame = recognizer.onFrame((frame) => onFrameRef.current?.(frame));
             void recognizer.start();
           }
         }
@@ -84,6 +129,8 @@ export function useSignRecognition(
       cancelled = true;
       unsubscribeSign?.();
       unsubscribeStatus?.();
+      unsubscribeFrame?.();
+      recognizerRef.current = null;
       recognizer?.stop();
       if (videoElement?.srcObject === stream) videoElement.srcObject = null;
       stream?.getTracks().forEach((tr) => tr.stop());

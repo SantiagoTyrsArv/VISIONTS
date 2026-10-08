@@ -30,5 +30,21 @@ services:
     ports:
       - "8000:8000"
 
+  trainer:
+    build: ./backend
+    command: ["python", "-m", "app.training.worker"]
+    # La API aplica las migraciones al arrancar; el worker reintenta hasta que existan las tablas.
+    env_file:
+      - ./backend/.env.example
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-senavoz}:${POSTGRES_PASSWORD:-senavoz}@db:5432/${POSTGRES_DB:-senavoz}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-dev-only-change-me}
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   pgdata:

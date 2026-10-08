@@ -5,6 +5,7 @@ import { HashRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Camera from '@/routes/Camera';
+import { useSignModel } from '@/store/signModel';
 
 const speak = vi.fn();
 const recognizerMock = vi.hoisted(() => ({
@@ -31,6 +32,10 @@ vi.mock('@/services/recognition/MediaPipeSignRecognizer', () => ({
     }
     onStatus(callback: (status: unknown) => void): () => void {
       callback({ phase: 'ready', handsDetected: false, modelAvailable: false });
+      return vi.fn();
+    }
+    setClassifier = vi.fn();
+    onFrame(): () => void {
       return vi.fn();
     }
   },
@@ -67,6 +72,8 @@ beforeEach(() => {
   recognizerMock.emitSign.mockReset();
   recognizerMock.start.mockReset();
   recognizerMock.stop.mockReset();
+  useSignModel.getState().clear();
+  useSignModel.setState({ status: 'none' });
 });
 
 describe('pantalla de cámara', () => {
@@ -74,7 +81,7 @@ describe('pantalla de cámara', () => {
     openCamera.mockResolvedValue(fakeStream);
     renderScreen();
     expect(
-      await screen.findByText(/Detector activo\. Falta un modelo entrenado/),
+      await screen.findByText(/Detector activo\. Graba tus señas/),
     ).toBeInTheDocument();
 
     await act(async () => {
@@ -119,12 +126,37 @@ describe('pantalla de cámara', () => {
     expect(recognizerMock.stop).toHaveBeenCalledTimes(1);
   });
 
-  it('panel de estado: cámara activa y modelo no instalado, con enlace a Frases', async () => {
+  it('panel de estado: sin modelo, con enlace a Entrenar', async () => {
     openCamera.mockResolvedValue(fakeStream);
     renderScreen();
-    expect(await screen.findByText('Falta un modelo entrenado')).toBeInTheDocument();
-    expect(screen.getByText('No instalado')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Ir a Frases' })).toHaveAttribute('href', '#/frases');
+    expect(await screen.findByText('Aún no tienes un modelo')).toBeInTheDocument();
+    expect(screen.getByText('Sin modelo')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ir a Entrenar' })).toHaveAttribute(
+      'href',
+      '#/entrenar',
+    );
+  });
+
+  it('con un modelo listo muestra su precisión y oculta el aviso', async () => {
+    useSignModel.setState({
+      status: 'ready',
+      metrics: { val_accuracy: 0.92, per_label: {}, samples: {} },
+      job: null,
+    });
+    openCamera.mockResolvedValue(fakeStream);
+    renderScreen();
+    expect(await screen.findByText('Listo · precisión 92 %')).toBeInTheDocument();
+    expect(screen.queryByText('Aún no tienes un modelo')).not.toBeInTheDocument();
+  });
+
+  it('mientras entrena lo indica', async () => {
+    useSignModel.setState({
+      status: 'none',
+      job: { id: 'm1', status: 'training', error: null, created_at: '' },
+    });
+    openCamera.mockResolvedValue(fakeStream);
+    renderScreen();
+    expect(await screen.findByText('Entrenando…')).toBeInTheDocument();
   });
 
   it('las señas reconocidas aparecen en "Últimas señas"', async () => {

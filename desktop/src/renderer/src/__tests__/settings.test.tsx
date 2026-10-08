@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { modelsApi, samplesApi } from '@/api/endpoints';
 import Settings from '@/routes/Settings';
 import { useSession } from '@/store/session';
 import { useSettings } from '@/store/settings';
@@ -89,5 +90,21 @@ describe('ajustes', () => {
     renderSettings();
     await userEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
     expect(logout).toHaveBeenCalled();
+  });
+
+  it('borra todos los datos de entrenamiento tras confirmar', async () => {
+    const remove = vi.spyOn(samplesApi, 'remove').mockResolvedValue(undefined);
+    vi.spyOn(modelsApi, 'status').mockResolvedValue({ ready: null, latest: null });
+    renderSettings();
+    const button = await screen.findByRole('button', {
+      name: 'Borrar todos mis datos de entrenamiento',
+    });
+    await userEvent.click(button);
+    expect(remove).not.toHaveBeenCalled();
+    await userEvent.click(
+      screen.getByRole('button', { name: '¿Seguro? Pulsa otra vez para borrar' }),
+    );
+    expect(remove).toHaveBeenCalledWith();
+    expect(await screen.findByText('Datos de entrenamiento borrados.')).toBeInTheDocument();
   });
 });

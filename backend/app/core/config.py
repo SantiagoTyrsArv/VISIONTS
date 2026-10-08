@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     rate_limit_login: str = "5/minute"
     rate_limit_register: str = "10/minute"
     rate_limit_refresh: str = "30/minute"
+    rate_limit_samples: str = "60/minute"
+    rate_limit_train: str = "10/hour"
 
     @field_validator("cors_origins", mode="before")
     @classmethod
