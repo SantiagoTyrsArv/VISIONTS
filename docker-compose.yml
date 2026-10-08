@@ -16,7 +16,9 @@ services:
       - "127.0.0.1:5432:5432"  # solo accesible desde tu máquina
 
   api:
-    build: ./backend
+    build:
+      context: ./backend
+      target: api
     # Credenciales y JWT_SECRET por defecto: SOLO para desarrollo local. Sobrescribir vía .env.
     env_file:
       - ./backend/.env.example
@@ -31,8 +33,9 @@ services:
       - "8000:8000"
 
   trainer:
-    build: ./backend
-    command: ["python", "-m", "app.training.worker"]
+    build:
+      context: ./backend
+      target: trainer
     # La API aplica las migraciones al arrancar; el worker reintenta hasta que existan las tablas.
     env_file:
       - ./backend/.env.example

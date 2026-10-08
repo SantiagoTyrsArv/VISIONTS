@@ -26,7 +26,7 @@ senavoz/
 docker compose up --build
 ```
 
-Levanta `db` (Postgres 17), `api` y `trainer` (entrena los modelos de señas en cola con PyTorch CPU). Al arrancar, el contenedor ejecuta `alembic upgrade head` y el seed idempotente de frases. La API queda en <http://localhost:8000>, con documentación interactiva en `/docs`.
+Levanta `db` (Postgres 17), `api` y `trainer` (entrena los modelos de señas en cola con PyTorch CPU). Ambos salen del mismo `Dockerfile` con objetivos distintos: la imagen de la API no incluye PyTorch. Al arrancar, el contenedor ejecuta `alembic upgrade head` y el seed idempotente de frases. La API queda en <http://localhost:8000>, con documentación interactiva en `/docs`.
 
 > Las credenciales de BD y el `JWT_SECRET` por defecto de `docker-compose.yml` son **solo para desarrollo**. Para cualquier otro entorno defínelos (`POSTGRES_PASSWORD`, `JWT_SECRET`) en un `.env` junto al compose. El secreto JWT debe tener ≥ 32 caracteres.
 

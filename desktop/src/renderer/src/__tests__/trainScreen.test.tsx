@@ -174,4 +174,24 @@ describe('pantalla Entrenar', () => {
       await screen.findByText('El entrenamiento falló: Entrenamiento interrumpido'),
     ).toBeInTheDocument();
   });
+
+  it('un fallo de subida tardío no detiene una sesión nueva de otra frase', async () => {
+    let rejectUpload: (e: unknown) => void = () => {};
+    vi.mocked(samplesApi.create).mockImplementationOnce(
+      () => new Promise((_, reject) => (rejectUpload = reject)),
+    );
+    renderScreen();
+    await screen.findByText('3 / 20 muestras');
+    await userEvent.click(within(row('Sí')).getByRole('button', { name: 'Grabar' }));
+    await sendFrames(30);
+    await userEvent.click(within(row('Sí')).getByRole('button', { name: 'Parar' }));
+    await userEvent.click(within(row('No')).getByRole('button', { name: 'Grabar' }));
+
+    await act(async () => rejectUpload(new AxiosError('Network Error')));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo enviar la muestra');
+    expect(within(row('No')).getByRole('button', { name: 'Parar' })).toBeInTheDocument();
+    await sendFrames(30);
+    expect(samplesApi.create).toHaveBeenLastCalledWith('no', expect.any(Array));
+  });
 });
