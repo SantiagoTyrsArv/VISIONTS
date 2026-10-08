@@ -7,7 +7,7 @@ import {
   type Landmarker,
 } from './MediaPipeSignRecognizer';
 import type { SignClassifier } from './SignClassifier';
-import type { RecognizedSign } from './SignRecognizer';
+import type { LandmarkFrame, RecognizedSign } from './SignRecognizer';
 
 type Harness = {
   video: HTMLVideoElement;
@@ -190,5 +190,71 @@ describe('MediaPipeSignRecognizer', () => {
     await Promise.resolve();
 
     expect(onSign).not.toHaveBeenCalled();
+  });
+
+  it('emite cada frame normalizado con si hay manos', async () => {
+    const frames: LandmarkFrame[] = [];
+    const recognizer = new MediaPipeSignRecognizer(h.video, {
+      createLandmarker: async () => h.landmarker,
+      scheduler: h.scheduler,
+    });
+    recognizer.onFrame((f) => frames.push(f));
+    await recognizer.start();
+    h.advance(10);
+    h.advance(20);
+
+    expect(frames).toHaveLength(2);
+    expect(frames[0]).toEqual({ values: Array(126).fill(0), handsDetected: false });
+  });
+
+  it('clasifica una vez cada 3 frames con el buffer lleno', async () => {
+    const classifier: SignClassifier = { classify: vi.fn().mockResolvedValue(null) };
+    const recognizer = new MediaPipeSignRecognizer(h.video, {
+      createLandmarker: async () => h.landmarker,
+      scheduler: h.scheduler,
+      classifier,
+    });
+    await recognizer.start();
+    for (let i = 0; i < 36; i += 1) {
+      h.advance(100 + i);
+      await Promise.resolve();
+      await Promise.resolve();
+    }
+    // Frames 30, 33 y 36.
+    expect(classifier.classify).toHaveBeenCalledTimes(3);
+  });
+
+  it('cambia de clasificador sin reiniciar la cámara y lo refleja en el estado', async () => {
+    const onStatus = vi.fn();
+    const classifier: SignClassifier = {
+      classify: vi.fn().mockResolvedValue({ code: 'yes', confidence: 0.95 }),
+    };
+    const onSign = vi.fn();
+    const recognizer = new MediaPipeSignRecognizer(h.video, {
+      createLandmarker: async () => h.landmarker,
+      scheduler: h.scheduler,
+    });
+    recognizer.onStatus(onStatus);
+    recognizer.onSign(onSign);
+    await recognizer.start();
+
+    recognizer.setClassifier(classifier);
+    expect(onStatus).toHaveBeenLastCalledWith({
+      phase: 'ready',
+      handsDetected: false,
+      modelAvailable: true,
+    });
+    for (let i = 0; i < 30; i += 1) {
+      h.advance(100 + i);
+      await Promise.resolve();
+      await Promise.resolve();
+    }
+    expect(onSign).toHaveBeenCalledWith({ code: 'yes', confidence: 0.95 });
+    expect(h.landmarker.close).not.toHaveBeenCalled();
+
+    recognizer.setClassifier(null);
+    expect(onStatus).toHaveBeenLastCalledWith(
+      expect.objectContaining({ modelAvailable: false }),
+    );
   });
 });

@@ -1,16 +1,11 @@
-import {
-  FilesetResolver,
-  HandLandmarker,
-  type HandLandmarkerResult,
-} from '@mediapipe/tasks-vision';
+import { HandLandmarker, type HandLandmarkerResult } from '@mediapipe/tasks-vision';
 import simdLoaderUrl from '@mediapipe/tasks-vision/vision_wasm_internal.js?url';
 import simdWasmUrl from '@mediapipe/tasks-vision/vision_wasm_internal.wasm?url';
-import noSimdLoaderUrl from '@mediapipe/tasks-vision/vision_wasm_nosimd_internal.js?url';
-import noSimdWasmUrl from '@mediapipe/tasks-vision/vision_wasm_nosimd_internal.wasm?url';
 
 import { LandmarkSequenceBuffer, type DetectedHand } from './landmarks';
 import type { SignClassifier } from './SignClassifier';
 import type {
+  LandmarkFrame,
   RecognitionStatus,
   RecognizedSign,
   SignRecognizer,
@@ -19,6 +14,9 @@ import type {
 
 export type Landmarker = Pick<HandLandmarker, 'detectForVideo' | 'close'>;
 type FrameCallback = (timestamp: number) => void;
+
+/** Se clasifica uno de cada 3 frames para no cargar la CPU durante las reuniones. */
+export const INFERENCE_STRIDE = 3;
 
 export type FrameScheduler = {
   request(video: HTMLVideoElement, callback: FrameCallback): number;
@@ -40,18 +38,13 @@ const frameScheduler: FrameScheduler = {
   },
 };
 
+// Solo se empaqueta el WASM con SIMD: cualquier PC con Windows 10/11 x64 lo admite.
 async function createDefaultLandmarker(): Promise<Landmarker> {
-  const hasSimd = await FilesetResolver.isSimdSupported();
-  const wasmFileset = hasSimd
-    ? { wasmLoaderPath: simdLoaderUrl, wasmBinaryPath: simdWasmUrl }
-    : { wasmLoaderPath: noSimdLoaderUrl, wasmBinaryPath: noSimdWasmUrl };
   const modelAssetPath = new URL('/models/hand_landmarker.task', window.location.href).toString();
-
-  return HandLandmarker.createFromOptions(wasmFileset, {
-    baseOptions: { modelAssetPath },
-    runningMode: 'VIDEO',
-    numHands: 2,
-  });
+  return HandLandmarker.createFromOptions(
+    { wasmLoaderPath: simdLoaderUrl, wasmBinaryPath: simdWasmUrl },
+    { baseOptions: { modelAssetPath }, runningMode: 'VIDEO', numHands: 2 },
+  );
 }
 
 function toDetectedHands(result: HandLandmarkerResult): DetectedHand[] {
@@ -74,10 +67,12 @@ export type MediaPipeRecognizerOptions = {
 export class MediaPipeSignRecognizer implements SignRecognizer {
   private readonly createLandmarker: () => Promise<Landmarker>;
   private readonly scheduler: FrameScheduler;
-  private readonly classifier: SignClassifier | null;
+  private classifier: SignClassifier | null;
   private readonly sequence = new LandmarkSequenceBuffer();
   private readonly signListeners = new Set<(sign: RecognizedSign) => void>();
   private readonly statusListeners = new Set<(status: RecognitionStatus) => void>();
+  private readonly frameListeners = new Set<(frame: LandmarkFrame) => void>();
+  private framesSinceInference = INFERENCE_STRIDE;
   private landmarker: Landmarker | null = null;
   private frameId: number | null = null;
   private running = false;
@@ -107,6 +102,7 @@ export class MediaPipeSignRecognizer implements SignRecognizer {
     const generation = this.generation;
     this.sequence.clear();
     this.previousTimestamp = -1;
+    this.framesSinceInference = INFERENCE_STRIDE;
     this.publishStatus({
       phase: 'initializing',
       handsDetected: false,
@@ -156,6 +152,17 @@ export class MediaPipeSignRecognizer implements SignRecognizer {
     return () => this.statusListeners.delete(callback);
   }
 
+  /** Cambia el modelo sin reiniciar la cámara (p. ej. al terminar un entrenamiento). */
+  setClassifier(classifier: SignClassifier | null): void {
+    this.classifier = classifier;
+    this.publishStatus({ ...this.status, modelAvailable: !!classifier });
+  }
+
+  onFrame(callback: (frame: LandmarkFrame) => void): Unsubscribe {
+    this.frameListeners.add(callback);
+    return () => this.frameListeners.delete(callback);
+  }
+
   private scheduleNextFrame(): void {
     if (!this.running || this.frameId !== null) return;
     this.frameId = this.scheduler.request(this.video, (timestamp) => {
@@ -181,8 +188,9 @@ export class MediaPipeSignRecognizer implements SignRecognizer {
       this.previousTimestamp = monotonicTimestamp;
       const result = landmarker.detectForVideo(this.video, monotonicTimestamp);
       const hands = toDetectedHands(result);
-      this.sequence.add(hands);
+      const values = this.sequence.add(hands);
       const detected = hands.length > 0;
+      this.frameListeners.forEach((callback) => callback({ values, handsDetected: detected }));
       if (detected !== this.handsDetected) {
         this.handsDetected = detected;
         this.publishStatus({
@@ -192,7 +200,16 @@ export class MediaPipeSignRecognizer implements SignRecognizer {
         });
       }
 
-      if (!this.classifier || !this.sequence.isReady || this.inferencePending) return;
+      this.framesSinceInference += 1;
+      if (
+        !this.classifier ||
+        !this.sequence.isReady ||
+        this.inferencePending ||
+        this.framesSinceInference < INFERENCE_STRIDE
+      ) {
+        return;
+      }
+      this.framesSinceInference = 0;
       this.inferencePending = true;
       const generation = this.generation;
       void this.classifier
