@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import delete, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.models import SignModel
@@ -23,13 +24,8 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def enqueue(db: Session, user_id: uuid.UUID) -> SignModel:
-    """Pone en cola un entrenamiento con las etiquetas que llegan al mínimo de muestras."""
-    active = db.scalar(
-        select(SignModel).where(SignModel.user_id == user_id, SignModel.status.in_(ACTIVE))
-    )
-    if active is not None:
-        raise TrainingInProgress
+def trainable_labels(db: Session, user_id: uuid.UUID) -> list[str]:
+    """Etiquetas que llegan al mínimo de muestras; lanza NotEnoughSamples si no bastan."""
     allowed = valid_labels(db)
     enough = sorted(
         label for label, n in counts(db, user_id).items() if n >= MIN_SAMPLES and label in allowed
@@ -40,9 +36,27 @@ def enqueue(db: Session, user_id: uuid.UUID) -> SignModel:
     )
     if missing:
         raise NotEnoughSamples(missing)
-    job = SignModel(user_id=user_id, status="queued", labels=enough)
+    return enough
+
+
+def _active_job(db: Session, user_id: uuid.UUID) -> SignModel | None:
+    return db.scalar(
+        select(SignModel).where(SignModel.user_id == user_id, SignModel.status.in_(ACTIVE))
+    )
+
+
+def enqueue(db: Session, user_id: uuid.UUID) -> SignModel:
+    """Pone en cola un entrenamiento con las etiquetas que llegan al mínimo de muestras."""
+    if _active_job(db, user_id) is not None:
+        raise TrainingInProgress
+    job = SignModel(user_id=user_id, status="queued", labels=trainable_labels(db, user_id))
     db.add(job)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Otra petición simultánea ya lo puso en cola (índice único parcial).
+        db.rollback()
+        raise TrainingInProgress from None
     return job
 
 
@@ -104,8 +118,11 @@ def claim_next(db: Session) -> SignModel | None:
     return job
 
 
-def finish(db: Session, job: SignModel, weights: dict, metrics: dict) -> None:
+def finish(
+    db: Session, job: SignModel, labels: list[str], weights: dict, metrics: dict
+) -> None:
     job.status, job.weights, job.metrics, job.finished_at = "ready", weights, metrics, _now()
+    job.labels = labels
     # Solo se conserva el modelo nuevo: los anteriores (listos o fallidos) sobran.
     db.execute(
         delete(SignModel).where(

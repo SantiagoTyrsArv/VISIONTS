@@ -8,14 +8,15 @@ import numpy as np
 import torch
 from torch import nn
 
+from app.training.errors import TrainingTimeout
 from app.training.model import SignGRU, export_weights
+
+__all__ = ["TrainResult", "TrainingTimeout", "train_model"]
 
 VAL_FRACTION = 0.2
 MAX_SHIFT = 3
 
 
-class TrainingTimeout(Exception):
-    pass
 
 
 @dataclass

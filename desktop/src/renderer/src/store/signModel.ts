@@ -2,11 +2,13 @@ import { create } from 'zustand';
 
 import { modelsApi } from '@/api/endpoints';
 import type { ModelJob, ModelMetrics } from '@/api/types';
-import { GruModel } from '@/services/recognition/GruModel';
+import { GruModel, InvalidModelError } from '@/services/recognition/GruModel';
 import { createSignClassifier, type SignClassifier } from '@/services/recognition/SignClassifier';
 import { useSession } from '@/store/session';
 
 export const MODEL_POLL_MS = 3000;
+/** Reintento tras un fallo de red, para no quedarse sin modelo hasta reiniciar. */
+export const MODEL_RETRY_MS = 10_000;
 const NEUTRAL = 'neutral';
 
 type ModelStatus = 'unknown' | 'none' | 'ready' | 'error';
@@ -48,6 +50,7 @@ export const useSignModel = create<SignModelState>()((set, get) => ({
     if (pollTimer) clearTimeout(pollTimer);
     pollTimer = null;
     let job: ModelJob | null = get().job;
+    let retry = false;
     try {
       const { ready, latest } = await modelsApi.status();
       if (gen !== generation) return;
@@ -70,16 +73,26 @@ export const useSignModel = create<SignModelState>()((set, get) => ({
             labels: [...model.labels],
             metrics: ready.metrics,
           });
-        } catch {
+        } catch (e) {
           if (gen !== generation) return;
-          set({ status: 'error', classifier: null, modelId: null, labels: [], metrics: null });
+          if (e instanceof InvalidModelError) {
+            set({ status: 'error', classifier: null, modelId: null, labels: [], metrics: null });
+          } else {
+            // Sin red al bajar los pesos: se sigue con el modelo anterior y se reintenta.
+            retry = true;
+          }
         }
       }
     } catch {
-      // Sin red: se conserva el estado actual y se reintenta en el siguiente sondeo.
+      // Sin red: se conserva el estado actual y se reintenta.
+      retry = true;
     }
-    if (gen === generation && isTraining(job)) {
-      pollTimer = setTimeout(() => void get().refresh(), MODEL_POLL_MS);
+    if (gen !== generation) return;
+    const delay = isTraining(job) ? MODEL_POLL_MS : retry ? MODEL_RETRY_MS : null;
+    if (delay !== null) {
+      // Un solo temporizador aunque haya varias consultas a la vez.
+      if (pollTimer) clearTimeout(pollTimer);
+      pollTimer = setTimeout(() => void get().refresh(), delay);
     }
   },
 

@@ -60,7 +60,7 @@ uvicorn app.main:app --reload
 | GET    | `/models/status`        | Bearer | Último modelo listo y entrenamiento más reciente                                               |
 | GET    | `/models/ready/weights` | Bearer | Pesos `senavoz-gru-v1` con `Cache-Control: no-store`                                           |
 
-Access token: 15 min. Refresh token: 7 días, `secrets.token_urlsafe`, guardado como SHA-256. Rate limiting por IP en login (5/min), register (10/min) y refresh (30/min), y por usuario en `POST /samples` (60/min).
+Access token: 15 min. Refresh token: 7 días, `secrets.token_urlsafe`, guardado como SHA-256. Rate limiting por IP en login (5/min), register (10/min) y refresh (30/min), y por usuario en `POST /samples` (60/min) y `POST /models/train` (10/hora).
 
 ### Variables de entorno (`backend/.env.example`)
 

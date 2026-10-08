@@ -95,3 +95,42 @@ def test_weights_no_store_and_isolated(client, auth, db_session):
     other = auth_headers(client, "otro@example.com")
     assert client.get("/models/ready/weights", headers=other).status_code == 404
     assert client.get("/models/status", headers=other).json() == {"ready": None, "latest": None}
+
+
+def test_only_one_active_job_per_user_in_db(db_session, registered):
+    import pytest
+    from sqlalchemy.exc import IntegrityError
+
+    user = _user(db_session)
+    db_session.add(SignModel(user_id=user.id, status="queued", labels=["a"]))
+    db_session.commit()
+    db_session.add(SignModel(user_id=user.id, status="training", labels=["a"]))
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+
+def test_concurrent_enqueue_maps_to_conflict(client, auth, seeded, db_session, monkeypatch):
+    from app.services import model_service
+
+    user = _user(db_session)
+    _enough(db_session, user.id)
+    db_session.add(SignModel(user_id=user.id, status="queued", labels=["neutral"]))
+    db_session.commit()
+    # Simula la carrera: la comprobación previa no ve el trabajo activo.
+    monkeypatch.setattr(model_service, "_active_job", lambda db, user_id: None)
+    assert client.post("/models/train", headers=auth).status_code == 409
+
+
+def test_train_is_rate_limited(client, auth, seeded, db_session):
+    from app.core.rate_limit import limiter
+
+    limiter.enabled = True
+    limiter.reset()
+    try:
+        codes = [client.post("/models/train", headers=auth).status_code for _ in range(11)]
+    finally:
+        limiter.enabled = False
+        limiter.reset()
+    assert codes[:10] == [422] * 10
+    assert codes[10] == 429

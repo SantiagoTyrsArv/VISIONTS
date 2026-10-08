@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { modelsApi } from '@/api/endpoints';
 import type { ModelStatus } from '@/api/types';
-import { MODEL_POLL_MS, useSignModel } from '@/store/signModel';
+import { MODEL_POLL_MS, MODEL_RETRY_MS, useSignModel } from '@/store/signModel';
 import { useSession } from '@/store/session';
 
 vi.mock('@/api/endpoints', () => ({
@@ -119,5 +119,50 @@ describe('store del modelo', () => {
     vi.mocked(modelsApi.status).mockRejectedValueOnce(new Error('offline'));
     await useSignModel.getState().refresh();
     expect(useSignModel.getState().status).toBe('ready');
+  });
+
+  it('si la primera consulta falla, reintenta hasta cargar el modelo', async () => {
+    vi.useFakeTimers();
+    vi.mocked(modelsApi.status)
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue({ ready: ready('m1'), latest: null });
+    vi.mocked(modelsApi.weights).mockResolvedValue(weights(['neutral', 'yes'], [0, 5]));
+    await useSignModel.getState().refresh();
+    expect(useSignModel.getState().status).toBe('unknown');
+    await vi.advanceTimersByTimeAsync(MODEL_RETRY_MS);
+    expect(useSignModel.getState()).toMatchObject({ status: 'ready', modelId: 'm1' });
+  });
+
+  it('un fallo de red al bajar los pesos conserva el modelo anterior y reintenta', async () => {
+    vi.useFakeTimers();
+    vi.mocked(modelsApi.status).mockResolvedValueOnce({ ready: ready('m1'), latest: null });
+    vi.mocked(modelsApi.weights).mockResolvedValueOnce(weights(['neutral', 'yes'], [0, 5]));
+    await useSignModel.getState().refresh();
+    const previous = useSignModel.getState().classifier;
+
+    vi.mocked(modelsApi.status).mockResolvedValue({ ready: ready('m2'), latest: null });
+    vi.mocked(modelsApi.weights)
+      .mockRejectedValueOnce(new Error('timeout'))
+      .mockResolvedValue(weights(['neutral', 'yes'], [0, 5]));
+    await useSignModel.getState().refresh();
+    expect(useSignModel.getState()).toMatchObject({ status: 'ready', modelId: 'm1' });
+    expect(useSignModel.getState().classifier).toBe(previous);
+
+    await vi.advanceTimersByTimeAsync(MODEL_RETRY_MS);
+    expect(useSignModel.getState().modelId).toBe('m2');
+  });
+
+  it('dos consultas a la vez no dejan sondeos vivos tras cerrar sesión', async () => {
+    vi.useFakeTimers();
+    vi.mocked(modelsApi.status).mockResolvedValue({
+      ready: null,
+      latest: { id: 'm1', status: 'training', error: null, created_at: '' },
+    });
+    useSession.setState({ status: 'authenticated' });
+    await Promise.all([useSignModel.getState().refresh(), useSignModel.getState().refresh()]);
+    expect(modelsApi.status).toHaveBeenCalledTimes(2);
+    useSession.setState({ status: 'unauthenticated' });
+    await vi.advanceTimersByTimeAsync(MODEL_POLL_MS * 3);
+    expect(modelsApi.status).toHaveBeenCalledTimes(2);
   });
 });

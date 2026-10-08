@@ -1,7 +1,18 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, LargeBinary, String, Text, Uuid
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    LargeBinary,
+    String,
+    Text,
+    Uuid,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -71,6 +82,16 @@ class SignModel(Base):
     """Un entrenamiento del modelo de señas de un usuario y, si termina bien, sus pesos."""
 
     __tablename__ = "sign_models"
+    # Como mucho un entrenamiento en cola o en curso por usuario, también con peticiones a la vez.
+    __table_args__ = (
+        Index(
+            "uq_sign_models_user_active",
+            "user_id",
+            unique=True,
+            postgresql_where=text("status IN ('queued', 'training')"),
+            sqlite_where=text("status IN ('queued', 'training')"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(

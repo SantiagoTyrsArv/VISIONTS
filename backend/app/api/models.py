@@ -1,18 +1,27 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.deps import get_current_user
+from app.core.rate_limit import limiter, user_or_ip
 from app.db.models import User
 from app.db.session import get_db
 from app.schemas.samples import ModelStatusOut
 from app.services import model_service
 
 router = APIRouter(prefix="/models", tags=["models"])
+_settings = get_settings()
 
 
 @router.post("/train", status_code=status.HTTP_202_ACCEPTED)
-def train(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+# Cada entrenamiento ocupa la CPU del trainer hasta 5 minutos.
+@limiter.limit(_settings.rate_limit_train, key_func=user_or_ip)
+def train(
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     try:
         job = model_service.enqueue(db, user.id)
     except model_service.TrainingInProgress:
