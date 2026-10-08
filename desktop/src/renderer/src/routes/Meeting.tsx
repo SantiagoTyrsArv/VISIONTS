@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Navigate } from 'react-router';
+import { useShallow } from 'zustand/react/shallow';
 
 import type { Phrase } from '@/api/types';
 import { usePhrases } from '@/api/usePhrases';
 import { useMeetingMode } from '@/hooks/useMeetingMode';
 import { useOutputDevices } from '@/hooks/useOutputDevices';
 import { usePhraseShortcuts } from '@/hooks/usePhraseShortcuts';
-import { useSignRecognition, visionMessageKey } from '@/hooks/useSignRecognition';
+import {
+  modelStatusText,
+  useSignRecognition,
+  visionMessageKey,
+} from '@/hooks/useSignRecognition';
 import { useVoicePreload } from '@/hooks/useVoicePreload';
 import { t } from '@/i18n';
 import { resolveMeetingOutput } from '@/services/audio/outputDevice';
@@ -14,6 +19,7 @@ import { speechService } from '@/services/speech';
 import { useMeeting } from '@/store/meeting';
 import { usePlayback } from '@/store/playback';
 import { useSettings } from '@/store/settings';
+import { useSignModel } from '@/store/signModel';
 import { IconExpand, IconWave } from '@/ui/icons';
 
 import styles from './meeting.module.css';
@@ -36,6 +42,9 @@ export default function Meeting() {
   const synthError = usePlayback((s) => s.synthError);
   const meetingOutput = useSettings((s) => s.meetingOutput);
   const { devices, loaded } = useOutputDevices();
+  const model = useSignModel(
+    useShallow((s) => ({ status: s.status, metrics: s.metrics, job: s.job })),
+  );
   useVoicePreload();
 
   const phrasesRef = useRef(phrases);
@@ -99,7 +108,10 @@ export default function Meeting() {
 
       <div className={styles.cam}>
         <video ref={videoRef} className={styles.thumb} autoPlay muted playsInline />
-        <p className={styles.small}>{t(visionMessageKey(recognition))}</p>
+        <div>
+          <p className={styles.small}>{t(visionMessageKey(recognition))}</p>
+          <p className={styles.small}>{modelStatusText(model)}</p>
+        </div>
       </div>
 
       {deviceMissing ? (

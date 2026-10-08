@@ -20,6 +20,7 @@ vi.mock('@/services/speech', () => ({
   },
 }));
 vi.mock('@/hooks/useSignRecognition', () => ({
+  modelStatusText: () => 'Sin modelo',
   useSignRecognition: () => ({
     cam: { kind: 'ready' },
     cameras: [],
