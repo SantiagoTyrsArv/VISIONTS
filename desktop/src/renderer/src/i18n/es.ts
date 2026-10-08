@@ -155,6 +155,12 @@ export const es = {
   'settings.cableDownload': 'Descargar VB-Cable',
   'settings.cableRecheck': 'Comprobar de nuevo',
   'settings.needCable': 'Instala VB-Cable para usar el Modo reunión.',
+  'settings.trainingData': 'Datos de entrenamiento',
+  'settings.trainingDataHint':
+    'Tus muestras y tu modelo se guardan en el servidor, asociados a tu cuenta. Puedes borrarlos cuando quieras.',
+  'settings.deleteTrainingData': 'Borrar todos mis datos de entrenamiento',
+  'settings.confirmDeleteTrainingData': '¿Seguro? Pulsa otra vez para borrar',
+  'settings.trainingDataDeleted': 'Datos de entrenamiento borrados.',
 
   'meeting.enter': 'Modo reunión',
   'meeting.cableReady': 'Micrófono virtual listo',
