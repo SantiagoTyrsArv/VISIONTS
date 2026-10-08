@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from app.api import auth, health, phrases, samples, users
+from app.api import auth, health, models, phrases, samples, users
 from app.core.config import get_settings
 from app.core.rate_limit import limiter
 
@@ -30,7 +30,8 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    for r in (health.router, auth.router, users.router, phrases.router, samples.router):
+    routers = (health, auth, users, phrases, samples, models)
+    for r in (m.router for m in routers):
         app.include_router(r)
     return app
 
