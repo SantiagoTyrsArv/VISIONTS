@@ -1,0 +1,4 @@
+# Solo para el servicio trainer y los tests: la API no importa torch ni numpy.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.1+cpu
+numpy==2.5.3
