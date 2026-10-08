@@ -69,49 +69,53 @@ export default function Train({ timing }: { timing?: Timing }) {
     setSession(null);
   };
 
-  const onEvent = (label: string) => (event: BurstEvent) => {
-    switch (event.type) {
-      case 'countdown':
-        setSession({ label, message: t('train.countdown', { n: String(event.secondsLeft) }) });
-        break;
-      case 'recording':
-        setSession({
-          label,
-          message: t('train.recording', {
-            n: String(event.burst),
-            total: String(BURSTS_PER_SESSION),
-          }),
-        });
-        break;
-      case 'rejected':
-        setNotice(t('train.rejected'));
-        break;
-      case 'sample':
-        setNotice(null);
-        // Se envía al momento; si falla, la muestra se pierde (no hay cola local).
-        samplesApi.create(label, event.frames).then(
-          () => void queryClient.invalidateQueries({ queryKey: SAMPLES_KEY }),
-          (e: unknown) => {
-            stopSession();
-            setError(t(apiErrorStatus(e) === 409 ? 'train.labelFull' : 'train.uploadError'));
-          },
-        );
-        break;
-      case 'done':
-        recorderRef.current = null;
-        setSession(null);
-        setNotice(t('train.done'));
-        break;
-    }
-  };
+  const onEvent =
+    (label: string, owner: { recorder: BurstRecorder | null }) => (event: BurstEvent) => {
+      switch (event.type) {
+        case 'countdown':
+          setSession({ label, message: t('train.countdown', { n: String(event.secondsLeft) }) });
+          break;
+        case 'recording':
+          setSession({
+            label,
+            message: t('train.recording', {
+              n: String(event.burst),
+              total: String(BURSTS_PER_SESSION),
+            }),
+          });
+          break;
+        case 'rejected':
+          setNotice(t('train.rejected'));
+          break;
+        case 'sample':
+          setNotice(null);
+          // Se envía al momento; si falla, la muestra se pierde (no hay cola local).
+          samplesApi.create(label, event.frames).then(
+            () => void queryClient.invalidateQueries({ queryKey: SAMPLES_KEY }),
+            (e: unknown) => {
+              // La respuesta puede llegar tarde: no se corta otra sesión empezada después.
+              if (recorderRef.current === owner.recorder) stopSession();
+              setError(t(apiErrorStatus(e) === 409 ? 'train.labelFull' : 'train.uploadError'));
+            },
+          );
+          break;
+        case 'done':
+          recorderRef.current = null;
+          setSession(null);
+          setNotice(t('train.done'));
+          break;
+      }
+    };
 
   const startSession = (label: string) => {
     setError(null);
     setNotice(null);
-    const recorder = new BurstRecorder(onEvent(label), {
+    const owner: { recorder: BurstRecorder | null } = { recorder: null };
+    const recorder = new BurstRecorder(onEvent(label, owner), {
       requireHands: label !== NEUTRAL,
       ...timing,
     });
+    owner.recorder = recorder;
     recorderRef.current = recorder;
     setSession({ label, message: '' });
     recorder.start();
