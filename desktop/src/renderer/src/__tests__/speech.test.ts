@@ -1,6 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { CachedAudioSpeechService } from '@/services/speech/CachedAudioSpeechService';
 import { WebSpeechService } from '@/services/speech/WebSpeechService';
 import { fakeSynth, voice } from '@/test/fakeSpeech';
 
@@ -35,33 +34,5 @@ describe('WebSpeechService', () => {
     await svc.speak('Hola');
 
     expect(raw.speak.mock.calls[0][0].voice).toBeNull();
-  });
-});
-
-describe('CachedAudioSpeechService', () => {
-  it('sin audio para el código delega en el fallback', async () => {
-    const fallback = { speak: vi.fn(async () => {}), stop: vi.fn() };
-    const svc = new CachedAudioSpeechService(fallback, () => ({
-      volume: 1,
-      rate: 1,
-      voiceURI: null,
-    }));
-    await svc.speak({ code: 'yes', text: 'Sí' });
-    expect(fallback.speak).toHaveBeenCalledWith({ code: 'yes', text: 'Sí' });
-  });
-
-  it('con audio para el código lo reproduce con el volumen de ajustes', async () => {
-    const fallback = { speak: vi.fn(async () => {}), stop: vi.fn() };
-    const audio = { volume: 1, play: vi.fn(async () => {}), pause: vi.fn() };
-    const svc = new CachedAudioSpeechService(
-      fallback,
-      () => ({ volume: 0.3, rate: 1, voiceURI: null }),
-      { yes: 'blob:yes' },
-      () => audio as unknown as HTMLAudioElement,
-    );
-    await svc.speak({ code: 'yes', text: 'Sí' });
-    expect(audio.play).toHaveBeenCalled();
-    expect(audio.volume).toBe(0.3);
-    expect(fallback.speak).not.toHaveBeenCalled();
   });
 });

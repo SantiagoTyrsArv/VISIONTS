@@ -1,8 +1,5 @@
 export type CameraErrorKey =
-  | 'camera.permissionDenied'
-  | 'camera.noCamera'
-  | 'camera.inUse'
-  | 'camera.error';
+  'camera.permissionDenied' | 'camera.noCamera' | 'camera.inUse' | 'camera.error';
 
 const errorName = (e: unknown) =>
   typeof e === 'object' && e !== null ? (e as { name?: string }).name : undefined;
@@ -35,7 +32,10 @@ export async function openCamera(
 ): Promise<MediaStream> {
   if (preferredId) {
     try {
-      return await media.getUserMedia({ video: { deviceId: { exact: preferredId } }, audio: false });
+      return await media.getUserMedia({
+        video: { deviceId: { exact: preferredId } },
+        audio: false,
+      });
     } catch (e) {
       if (cameraErrorKey(e) !== 'camera.noCamera') throw e;
     }

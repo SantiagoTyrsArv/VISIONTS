@@ -7,8 +7,8 @@ flowchart LR
   subgraph Desktop["App de escritorio (Electron, Windows)"]
     subgraph Renderer["Renderer (React)"]
       Cam["getUserMedia\n(webcam)"]
-      Rec["SignRecognizer\n(MVP: Mock · F3: tasks-vision + modelo)"]
-      Speech["SpeechService\n(Web Speech · F4: audio cacheado + setSinkId)"]
+      Rec["MediaPipe Hand Landmarker\n(landmarks locales · clasificador pendiente)"]
+      Speech["SpeechService\n(voces de Windows + setSinkId)"]
       UI["React Router\nZustand + TanStack Query"]
       Cam --> Rec --> Speech
       UI --> Speech
@@ -30,9 +30,9 @@ flowchart LR
   Meet["Reunión (Zoom/Meet/Teams)"]
 
   UI -- "HTTPS + JWT" --> API
-  Rec -. "F2: secuencias de landmarks" .-> API
+  Rec -. "F2: secuencias de landmarks (futuro)" .-> API
   API -. "F3: modelo entrenado" .-> Rec
-  Speech -. "F4: setSinkId" .-> VCable --> Meet
+  Speech -- "setSinkId" --> VCable --> Meet
 ```
 
 Las líneas punteadas son fases futuras; el MVP implementa las sólidas.
@@ -73,24 +73,24 @@ Implementado (migración `0001`): `users`, `refresh_tokens`, `phrases`.
 
 **`sign_samples`** — muestras grabadas por el usuario para entrenar (Fase 2).
 
-| Columna | Tipo | Nota |
-|---|---|---|
-| id | UUID PK | |
-| user_id | UUID FK → users | |
-| phrase_id | UUID FK → phrases | etiqueta de la seña |
-| landmarks | JSON / array float | 30 × 126, normalizado respecto a la muñeca |
-| created_at | timestamptz | |
+| Columna    | Tipo               | Nota                                       |
+| ---------- | ------------------ | ------------------------------------------ |
+| id         | UUID PK            |                                            |
+| user_id    | UUID FK → users    |                                            |
+| phrase_id  | UUID FK → phrases  | etiqueta de la seña                        |
+| landmarks  | JSON / array float | 30 × 126, normalizado respecto a la muñeca |
+| created_at | timestamptz        |                                            |
 
 **`ml_models`** — modelos entrenados por usuario (Fase 3).
 
-| Columna | Tipo | Nota |
-|---|---|---|
-| id | UUID PK | |
-| user_id | UUID FK → users | |
-| version | int | incremental por usuario |
-| model_path | text | ubicación del modelo exportado (formato por decidir en la Fase 3) |
-| metrics | JSON | accuracy, matriz de confusión, nº de muestras… |
-| created_at | timestamptz | |
+| Columna    | Tipo            | Nota                                                              |
+| ---------- | --------------- | ----------------------------------------------------------------- |
+| id         | UUID PK         |                                                                   |
+| user_id    | UUID FK → users |                                                                   |
+| version    | int             | incremental por usuario                                           |
+| model_path | text            | ubicación del modelo exportado (formato por decidir en la Fase 3) |
+| metrics    | JSON            | accuracy, matriz de confusión, nº de muestras…                    |
+| created_at | timestamptz     |                                                                   |
 
 ## Decisiones
 
@@ -100,29 +100,34 @@ Implementado (migración `0001`): `users`, `refresh_tokens`, `phrases`.
 
 **Proceso main mínimo y aislado.** Main solo gestiona ventana, protocolo, permisos (solo cámara) y tokens. Toda la lógica de producto está en el renderer, con `contextIsolation` + `sandbox`. El preload expone una API de tres funciones.
 
-**Inferencia local.** El reconocimiento correrá en el PC (MediaPipe Hand Landmarker + modelo propio). La latencia es baja y predecible para conversar en vivo, funciona sin red y el vídeo nunca sale del equipo: solo se suben landmarks numéricos, y solo al grabar muestras.
+**Visión local.** MediaPipe Hand Landmarker ya detecta hasta dos manos en el renderer y produce landmarks sin enviar vídeo ni landmarks al backend. El archivo del detector y los WASM se empaquetan localmente. La clasificación de señas aún requiere un modelo entrenado y configurado; mientras no exista, la pantalla comunica que hay detección de manos, pero no activa una frase.
+
+El artefacto de detección de manos incluido es el modelo oficial [Hand Landmarker](https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task); MediaPipe lo utiliza para extraer keypoints y no para clasificar señas del catálogo.
 
 **Entrenamiento en servidor.** Una red LSTM/GRU pequeña conviene entrenarla en lote. El servidor recibe muestras, entrena, evalúa y exporta un modelo versionado que la app descarga. Así el ciclo de mejora del modelo va separado del de publicación de la app.
 
-**TTS pregenerado/cacheado.** Las frases son un conjunto cerrado y pequeño. Se pueden pregenerar con una voz de más calidad que la del sistema y reproducirlas localmente. `SpeechService` ya abstrae esto: hoy usa `WebSpeechService` (voces del sistema), y `CachedAudioSpeechService` ya reproduce un audio local por `code` y cae al TTS si no hay audio.
+**TTS pregenerado/cacheado.** Las frases son un conjunto cerrado y pequeño. Se pueden pregenerar con una voz de más calidad que la del sistema y reproducirlas localmente. `SpeechService` lo abstrae: `GeneratedSpeechService` reproduce el audio generado con las voces de Windows (precargado para todo el catálogo) y, solo fuera del Modo reunión, cae a `WebSpeechService` si la síntesis falla.
 
-**Audio hacia la reunión.** `speechSynthesis` no permite elegir el dispositivo de salida, así que la voz del sistema no puede ir al cable virtual. En la Fase 4 se usarán audios pregenerados reproducidos con `HTMLAudioElement.setSinkId()` hacia el dispositivo virtual (VB-Cable), que la reunión usa como micrófono.
+**Audio hacia la reunión (Modo reunión).** El main genera WAV con las voces OneCore de Windows (`resources/tts/synth.ps1`, WinRT vía PowerShell) y los guarda en `userData/tts-cache/` por voz + velocidad + texto. El renderer los reproduce con `HTMLAudioElement.setSinkId()` hacia VB-Cable ("CABLE Input"), que la reunión usa como micrófono ("CABLE Output"). En Modo reunión la voz nunca sale por los altavoces. La ventana se vuelve compacta y siempre visible, y Ctrl+Alt+1…9 funcionan con la reunión enfocada. Spec: `docs/superpowers/specs/2026-10-07-meeting-mode-design.md`.
 
-**Interfaces desacopladas.** `SignRecognizer` y `SpeechService` son el contrato entre la UI y las capacidades cambiantes. `MockSignRecognizer` demuestra el flujo seña → voz sin ML, y la pantalla de cámara solo conoce la interfaz.
+**Interfaces desacopladas.** `SignRecognizer` y `SpeechService` son el contrato entre la UI y las capacidades cambiantes. `MediaPipeSignRecognizer` implementa la detección de manos y admite un clasificador temporal opcional; la pantalla de cámara no depende directamente de MediaPipe.
 
 ## Roadmap
 
 ### Fase 2 — Captura de datos
-- `@mediapipe/tasks-vision` (HandLandmarker, modo VIDEO) sobre la webcam, en el renderer.
-- Grabación **en ráfaga con cuenta atrás**: 3‑2‑1, 30 frames, pausa, y repetir hasta N muestras por frase.
-- Secuencias de **30 frames × 126 valores** (2 manos × 21 puntos × xyz), normalizadas respecto a la muñeca (mano ausente → ceros). Normalización en TypeScript puro, reutilizable para la inferencia.
+
+- **Base de visión implementada:** `@mediapipe/tasks-vision` (HandLandmarker, modo VIDEO) sobre la webcam, en el renderer; modelo del detector y WASM empaquetados con la app.
+- Pendiente: grabación en ráfaga con cuenta atrás (3‑2‑1, 30 frames, pausa, repetir hasta N muestras por frase).
+- Secuencias de **30 frames × 126 valores** (2 manos × 21 puntos × xyz), normalizadas respecto a la muñeca (mano ausente → ceros). La normalización TypeScript pura y la ventana temporal ya están implementadas.
 - Subida al backend: `POST /samples` → tabla `sign_samples`.
 
 ### Fase 3 — Entrenamiento e inferencia
-- Worker de entrenamiento (LSTM/GRU pequeña) por usuario, con clase **"neutral"** para el reposo, umbral de confianza y *cooldown* entre detecciones para evitar repeticiones.
+
+- Pendiente: entrenar/validar un modelo de señas y configurar mapeo de etiquetas a códigos de frase. El adaptador de clasificador aplica umbral y cooldown, pero no hay pesos incluidos todavía.
+- Worker de entrenamiento (LSTM/GRU pequeña) por usuario, con clase **"neutral"** para el reposo, umbral de confianza y _cooldown_ entre detecciones para evitar repeticiones.
 - Registro en `ml_models` y endpoint de descarga.
 - Inferencia en el renderer implementando `SignRecognizer` sin tocar la UI. **Dirección, no decisión:** TF.js u ONNX Runtime Web.
 
-### Fase 4 — Voz hacia la reunión
-- Audios pregenerados/cacheados por frase.
-- Selección del dispositivo de salida (`setSinkId`) hacia el cable de audio virtual enrutado como micrófono de la reunión.
+### Modo reunión — hecho
+
+Ver la spec `docs/superpowers/specs/2026-10-07-meeting-mode-design.md` y el plan `docs/superpowers/plans/2026-10-07-meeting-mode.md`.

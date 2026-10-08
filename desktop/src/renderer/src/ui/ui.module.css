@@ -1,43 +1,81 @@
+/* ---------- Botones ---------- */
 .button {
   min-height: 48px;
   padding: 0 20px;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-s);
+  font: inherit;
   font-weight: 700;
-  font-size: 17px;
+  font-size: 16px;
   cursor: pointer;
-  background: var(--primary);
-  color: var(--primary-text);
+  background: var(--accent);
+  color: var(--accent-text);
+  transition:
+    background-color 0.15s,
+    transform 0.1s;
+}
+.button:hover:not(:disabled) {
+  background: var(--accent-press);
+}
+.button:active:not(:disabled) {
+  transform: translateY(1px);
 }
 .secondary {
-  background: var(--border);
+  background: transparent;
   color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.secondary:hover:not(:disabled) {
+  background: var(--surface-raised);
 }
 .danger {
-  background: var(--danger);
-  color: var(--primary-text);
+  background: transparent;
+  color: var(--danger);
+  box-shadow: inset 0 0 0 1px var(--danger-border);
+}
+.danger:hover:not(:disabled) {
+  background: var(--danger-bg);
 }
 .button:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: default;
 }
+.button[aria-busy='true'] {
+  cursor: progress;
+}
+
+/* ---------- Campos ---------- */
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 .label {
-  color: var(--text-muted);
-  font-weight: 600;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 15px;
 }
 .input {
+  width: 100%;
   min-height: 48px;
   padding: 0 14px;
-  border-radius: 12px;
-  border: 2px solid var(--border);
+  border-radius: var(--radius-s);
+  border: 1px solid var(--border-strong);
   background: var(--surface);
   color: var(--text);
+  font: inherit;
   font-size: 17px;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.input:hover {
+  border-color: var(--text-muted);
+}
+.input:focus-visible {
+  outline: none;
+  border-color: var(--live);
+  box-shadow: 0 0 0 3px rgba(122, 184, 255, 0.3);
 }
 .input[aria-invalid='true'] {
   border-color: var(--danger);
@@ -49,23 +87,22 @@
 }
 .inputWrap .input {
   width: 100%;
-  padding-right: 48px;
+  padding-right: 52px;
 }
 .eyeBtn {
   position: absolute;
-  right: 10px;
+  right: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition: color 0.15s;
 }
 .eyeBtn:hover {
   color: var(--text);
@@ -76,57 +113,163 @@
 }
 .fieldError {
   color: var(--danger);
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 14px;
 }
-.auth {
-  min-height: 100%;
+
+/* ---------- Marca ---------- */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+.brandMark {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
-  padding: 24px;
+  background: var(--accent);
+  color: var(--accent-text);
 }
-.authBox {
-  width: min(420px, 100%);
+.brandInverted .brandMark {
+  background: var(--accent-text);
+  color: var(--accent);
+}
+
+/* ---------- Pantallas de acceso: panel de marca + formulario ---------- */
+.auth {
+  min-height: 100%;
+  display: flex;
+  flex-wrap: wrap;
+}
+.authHero {
+  flex: 1 1 380px;
+  padding: 48px;
+  background: var(--accent);
+  color: var(--accent-text);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 40px;
+}
+.authCopy {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  max-width: 460px;
 }
-.brand {
-  color: var(--card);
-  font-size: 40px;
-  font-weight: 900;
+.authClaim {
   margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(36px, 4.4vw, 52px);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+}
+.authSub {
+  margin: 0;
+  font-size: 18px;
+  max-width: 400px;
+}
+.authBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 56px;
+}
+.authBars span {
+  width: 8px;
+  border-radius: 4px;
+  background: var(--accent-text);
+}
+.authMain {
+  flex: 1 1 460px;
+  padding: 48px 24px;
+  display: grid;
+  place-items: center;
+}
+.authBox {
+  width: min(400px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 .title {
-  font-size: 24px;
-  margin: 0 0 8px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 .splash {
   height: 100%;
   display: grid;
   place-items: center;
   color: var(--text-muted);
+  font-size: 18px;
 }
+
+/* ---------- Tarjeta de frase ---------- */
 .card {
-  position: relative;
-  min-height: 130px;
-  padding: 16px;
-  border: 0;
-  border-radius: 18px;
-  background: var(--card);
-  color: var(--card-text);
-  font-size: 24px;
-  font-weight: 800;
+  min-height: 132px;
+  padding: 18px 20px;
+  border-radius: 16px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s,
+    transform 0.08s;
+}
+.card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
 }
 .card:active {
-  transform: scale(0.97);
-  opacity: 0.8;
+  transform: translateY(2px);
 }
+.cardActive,
+.cardActive:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.cardText {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 1.2;
+}
+/* Atajo de teclado dibujado como una tecla. */
 .shortcut {
-  position: absolute;
-  top: 8px;
-  left: 12px;
-  font-size: 14px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 8px;
+  display: inline-grid;
+  place-items: center;
+  background: var(--surface-raised);
+  color: #d5d8de;
+  box-shadow: inset 0 -2px 0 #1a1d22;
   font-weight: 700;
-  opacity: 0.6;
+  font-size: 15px;
+}
+.cardActive .shortcut {
+  background: var(--accent);
+  color: var(--accent-text);
+  box-shadow: none;
 }

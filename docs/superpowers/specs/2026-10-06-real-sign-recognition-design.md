@@ -15,7 +15,7 @@ Reemplazar la simulación de la pantalla Cámara por detección visual real en t
 
 ## Diseño
 
-1. Implementar un adaptador de cámara basado en `@mediapipe/tasks-vision` que procese frames del elemento `<video>` en modo VIDEO y emita landmarks normalizados para hasta dos manos.
+1. Implementar un adaptador de cámara basado en `@mediapipe/tasks-vision` que procese frames del elemento `<video>` en modo VIDEO y emita landmarks normalizados para hasta dos manos. Empaquetar con la app los WASM y el modelo oficial Hand Landmarker, que detecta manos pero no clasifica señas.
 2. Mantener captura y predicción en el renderer. El vídeo y los landmarks permanecen locales; no se suben imágenes ni se requiere conexión para inferir.
 3. Mantener `SignRecognizer` como límite de la pantalla. El reconocedor real se configura con el elemento de vídeo activo; dispone de `start/stop`, libera el landmarker al salir y no procesa frames mientras el vídeo no esté listo.
 4. Separar detector de manos y clasificador de señas. Si el artefacto compatible no está disponible, la UI informa que el reconocimiento de señas todavía no está configurado; no debe presentar detecciones falsas.

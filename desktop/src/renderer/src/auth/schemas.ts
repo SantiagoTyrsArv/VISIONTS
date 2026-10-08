@@ -34,4 +34,3 @@ export const registerSchema = z
 
 export type LoginForm = z.infer<typeof loginSchema>;
 export type RegisterForm = z.infer<typeof registerSchema>;
-

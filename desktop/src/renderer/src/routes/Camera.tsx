@@ -1,152 +1,133 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import type { JSX } from 'react';
+import { Link } from 'react-router';
 
 import { usePhrases } from '@/api/usePhrases';
+import { useSignRecognition, visionMessageKey } from '@/hooks/useSignRecognition';
 import { t } from '@/i18n';
-import {
-  cameraErrorKey,
-  listCameras,
-  openCamera,
-  type CameraErrorKey,
-} from '@/services/camera/camera';
-import { MockSignRecognizer } from '@/services/recognition/MockSignRecognizer';
-import type { SignRecognizer } from '@/services/recognition/SignRecognizer';
 import { speechService } from '@/services/speech';
-import { useSettings } from '@/store/settings';
 import { Button } from '@/ui/Button';
 
 import styles from './routes.module.css';
 
-type CamState = { kind: 'starting' } | { kind: 'ready' } | { kind: 'error'; key: CameraErrorKey };
+const RECENT = 5;
 
-export default function Camera() {
+function Status({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <span className={ok ? styles.statusValue : `${styles.statusValue} ${styles.statusWarn}`}>
+      <span className={ok ? styles.dotLive : styles.dotWarn} aria-hidden />
+      {label}
+    </span>
+  );
+}
+
+export default function Camera(): JSX.Element {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const cameraId = useSettings((s) => s.cameraId);
-  const setCameraId = useSettings((s) => s.setCameraId);
   const { data: phrases } = usePhrases();
-  const [cam, setCam] = useState<CamState>({ kind: 'starting' });
-  const [attempt, setAttempt] = useState(0);
-  const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
-  const [lastSign, setLastSign] = useState<string | null>(null);
-  const [debugIndex, setDebugIndex] = useState(0);
-
-  // Fase 3: sustituir por el reconocedor real. El resto de la pantalla solo
-  // conoce la interfaz SignRecognizer.
-  const recognizer = useMemo(() => new MockSignRecognizer(), []);
-  const recognizerApi: SignRecognizer = recognizer;
-
-  // Catálogo accesible desde el callback sin re-suscribirse en cada render.
-  const phrasesRef = useRef(phrases);
-  useEffect(() => {
-    phrasesRef.current = phrases;
-  });
-
-  useEffect(() => {
-    let stream: MediaStream | null = null;
-    let cancelled = false;
-    openCamera(cameraId)
-      .then(async (s) => {
-        if (cancelled) {
-          s.getTracks().forEach((tr) => tr.stop());
-          return;
-        }
-        stream = s;
-        const video = videoRef.current;
-        if (video) {
-          video.srcObject = s;
-          try {
-            await video.play?.();
-          } catch {
-            // jsdom / autoplay: el vídeo arranca igualmente con autoPlay.
-          }
-        }
-        setCam({ kind: 'ready' });
-        // Con el permiso concedido, las etiquetas de los dispositivos ya son legibles.
-        setCameras(await listCameras());
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setCam({ kind: 'error', key: cameraErrorKey(e) });
-      });
-    return () => {
-      cancelled = true;
-      stream?.getTracks().forEach((tr) => tr.stop());
-    };
-  }, [cameraId, attempt]);
-
-  useEffect(() => {
-    const off = recognizerApi.onSign(({ code }) => {
-      const phrase = phrasesRef.current?.find((p) => p.code === code);
+  const [recent, setRecent] = useState<string[]>([]);
+  const { cam, cameras, recognition, cameraId, retry, selectCamera } = useSignRecognition(
+    videoRef,
+    (code) => {
+      const phrase = phrases?.find((p) => p.code === code);
       if (!phrase) return;
-      setLastSign(phrase.text_es);
+      setRecent((r) => [phrase.text_es, ...r].slice(0, RECENT));
       void speechService.speak({ code: phrase.code, text: phrase.text_es });
-    });
-    void recognizerApi.start();
-    return () => {
-      off();
-      recognizerApi.stop();
-    };
-  }, [recognizerApi]);
-
-  const retry = () => {
-    setCam({ kind: 'starting' });
-    setAttempt((a) => a + 1);
-  };
-  const next = phrases && phrases.length > 0 ? phrases[debugIndex % phrases.length] : undefined;
+    },
+  );
+  const ready = cam.kind === 'ready';
+  const modelAvailable = recognition?.modelAvailable ?? false;
+  const hands = recognition?.handsDetected ?? false;
 
   return (
-    <div className={styles.cameraWrap}>
-      <video ref={videoRef} className={styles.video} autoPlay muted playsInline />
-      <div className={styles.overlay}>
-        <div className={styles.banner}>
+    <div className={styles.page}>
+      <header className={styles.pageHeader}>
+        <div>
+          <h1 className={styles.title}>{t('camera.title')}</h1>
+          <p className={styles.hint}>{t('camera.subtitle')}</p>
+        </div>
+        {cameras.length > 1 ? (
+          <label className={styles.field}>
+            <span className={styles.muted}>{t('camera.select')}</span>
+            <select
+              className={styles.select}
+              value={cameraId ?? ''}
+              onChange={(e) => selectCamera(e.target.value || null)}
+            >
+              <option value="">{t('settings.cameraDefault')}</option>
+              {cameras.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+      </header>
+
+      <div className={styles.cameraLayout}>
+        <div className={styles.stage}>
+          <video ref={videoRef} className={styles.video} autoPlay muted playsInline />
           {cam.kind === 'error' ? (
             <div role="alert" className={styles.cameraError}>
               <p>{t(cam.key)}</p>
               <Button label={t('camera.retry')} onClick={retry} />
             </div>
-          ) : cam.kind === 'starting' ? (
-            <span role="status">{t('camera.starting')}</span>
           ) : (
-            t('camera.comingSoon')
+            <span role="status" className={styles.chip}>
+              <span className={hands ? styles.dotLive : styles.dotWarn} aria-hidden />
+              {cam.kind === 'starting' ? t('camera.starting') : t(visionMessageKey(recognition))}
+            </span>
           )}
+          {recent[0] ? (
+            <p className={styles.signBanner}>{t('camera.signDetected', { text: recent[0] })}</p>
+          ) : null}
         </div>
 
-        <div className={styles.bottom}>
-          {lastSign ? (
-            <p className={styles.detected}>{t('camera.signDetected', { text: lastSign })}</p>
-          ) : null}
-          {cameras.length > 1 ? (
-            <label className={styles.debug}>
-              <span className={styles.debugTitle}>{t('camera.select')}</span>
-              <select
-                className={styles.select}
-                value={cameraId ?? ''}
-                onChange={(e) => {
-                  setCam({ kind: 'starting' });
-                  setCameraId(e.target.value || null);
-                }}
-              >
-                <option value="">{t('settings.cameraDefault')}</option>
-                {cameras.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          {next ? (
-            <div className={styles.debug}>
-              <p className={styles.debugTitle}>{t('camera.debugTitle')}</p>
-              <Button
-                variant="secondary"
-                label={t('camera.debugSimulate', { text: next.text_es })}
-                onClick={() => {
-                  recognizer.simulate(next.code);
-                  setDebugIndex((i) => i + 1);
-                }}
+        <aside className={styles.aside}>
+          <section className={styles.panel}>
+            <h2 className={styles.panelTitle}>{t('camera.statusTitle')}</h2>
+            <p className={styles.statusRow}>
+              {t('camera.statusCamera')}
+              <Status ok={ready} label={t(ready ? 'camera.on' : 'camera.off')} />
+            </p>
+            <p className={styles.statusRow}>
+              {t('camera.statusHands')}
+              <Status ok={hands} label={t(hands ? 'camera.handsYes' : 'camera.handsNo')} />
+            </p>
+            <p className={styles.statusRow}>
+              {t('camera.statusModel')}
+              <Status
+                ok={modelAvailable}
+                label={t(modelAvailable ? 'camera.modelYes' : 'camera.modelNo')}
               />
-            </div>
+            </p>
+          </section>
+
+          {ready && !modelAvailable ? (
+            <section className={styles.warnPanel}>
+              <h2>{t('camera.noModelTitle')}</h2>
+              <p>{t('camera.noModelBody')}</p>
+              <Link to="/frases" className={styles.linkButton}>
+                {t('camera.toPhrases')}
+              </Link>
+            </section>
           ) : null}
-        </div>
+
+          <section className={styles.panel}>
+            <h2 className={styles.panelTitle} id="recent-title">
+              {t('camera.recentTitle')}
+            </h2>
+            {recent.length ? (
+              <ul className={styles.recentList} aria-labelledby="recent-title">
+                {recent.map((text, i) => (
+                  <li key={`${text}-${i}`}>{text}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className={styles.muted}>{t('camera.recentEmpty')}</p>
+            )}
+          </section>
+        </aside>
       </div>
     </div>
   );

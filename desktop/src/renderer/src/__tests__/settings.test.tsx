@@ -1,68 +1,92 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Settings from '@/routes/Settings';
 import { useSession } from '@/store/session';
 import { useSettings } from '@/store/settings';
-import { voice } from '@/test/fakeSpeech';
+import { installFakeSenavoz } from '@/test/fakeSenavoz';
 
 const speak = vi.fn();
 vi.mock('@/services/speech', () => ({
   speechService: { speak: (...a: unknown[]) => speak(...a), stop: vi.fn() },
 }));
-let voices: SpeechSynthesisVoice[] = [];
-vi.mock('@/services/speech/useSpanishVoices', () => ({ useSpanishVoices: () => voices }));
 vi.mock('@/services/camera/camera', () => ({ listCameras: async () => [] }));
 
 const logout = vi.fn(async () => {});
+const voices = [
+  { id: 'id-helena', name: 'Microsoft Helena', lang: 'es-ES' },
+  { id: 'id-pablo', name: 'Microsoft Pablo', lang: 'es-ES' },
+];
+
+function renderSettings() {
+  return render(
+    <MemoryRouter>
+      <Settings />
+    </MemoryRouter>,
+  );
+}
 
 beforeEach(() => {
-  voices = [voice('Helena', 'es-ES', true), voice('Pablo', 'es-ES')];
+  installFakeSenavoz({ voices });
   logout.mockClear();
   speak.mockReset();
-  useSettings.setState({ volume: 1, rate: 1, voiceURI: null, cameraId: null });
+  useSettings.setState({ volume: 1, rate: 1, voiceId: null, cameraId: null, meetingOutput: null });
   useSession.setState({
     status: 'authenticated',
-    user: { id: '1', email: 'ana@example.com', display_name: 'Ana', is_active: true, created_at: '' },
+    user: {
+      id: '1',
+      email: 'ana@example.com',
+      display_name: 'Ana',
+      is_active: true,
+      created_at: '',
+    },
     logout,
   });
 });
 
 describe('ajustes', () => {
   it('muestra el perfil', () => {
-    render(<Settings />);
+    renderSettings();
     expect(screen.getByText('Ana')).toBeInTheDocument();
     expect(screen.getByText('ana@example.com')).toBeInTheDocument();
   });
 
-  it('volumen y velocidad se ajustan y guardan', async () => {
-    render(<Settings />);
-    await userEvent.click(screen.getByRole('button', { name: 'Volumen -' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Velocidad +' }));
+  it('volumen y velocidad se ajustan con los controles deslizantes', () => {
+    renderSettings();
+    fireEvent.change(screen.getByLabelText('Volumen'), { target: { value: '90' } });
+    fireEvent.change(screen.getByLabelText('Velocidad'), { target: { value: '125' } });
     expect(useSettings.getState()).toMatchObject({ volume: 0.9, rate: 1.25 });
   });
 
-  it('elegir una voz la guarda', async () => {
-    render(<Settings />);
-    await userEvent.selectOptions(screen.getByLabelText('Voz del sistema'), 'uri:Pablo');
-    expect(useSettings.getState().voiceURI).toBe('uri:Pablo');
+  it('lista las voces de Windows y guarda la elegida', async () => {
+    renderSettings();
+    await screen.findByRole('option', { name: 'Microsoft Pablo (es-ES)' });
+    await userEvent.selectOptions(screen.getByLabelText('Voz'), 'id-pablo');
+    expect(useSettings.getState().voiceId).toBe('id-pablo');
   });
 
-  it('sin voces en español lo avisa', () => {
-    voices = [];
-    render(<Settings />);
-    expect(screen.getByText(/No hay voces en español instaladas/)).toBeInTheDocument();
+  it('avisa si la voz guardada ya no está instalada', async () => {
+    useSettings.setState({ voiceId: 'id-desinstalada' });
+    renderSettings();
+    expect(await screen.findByText(/ya no está instalada/)).toBeInTheDocument();
+  });
+
+  it('sin voces en español lo avisa', async () => {
+    installFakeSenavoz({ voices: [] });
+    renderSettings();
+    expect(await screen.findByText(/No hay voces en español instaladas/)).toBeInTheDocument();
   });
 
   it('probar voz habla la frase de prueba', async () => {
-    render(<Settings />);
+    renderSettings();
     await userEvent.click(screen.getByRole('button', { name: 'Probar voz' }));
     expect(speak).toHaveBeenCalledWith('Hola, así sonará mi voz');
   });
 
   it('cerrar sesión llama a logout', async () => {
-    render(<Settings />);
+    renderSettings();
     await userEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
     expect(logout).toHaveBeenCalled();
   });

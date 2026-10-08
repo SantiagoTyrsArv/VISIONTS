@@ -1,16 +1,39 @@
 :root {
-  --bg: #0b1220;
-  --surface: #16213a;
-  --card: #ffd60a;
-  --card-text: #111827;
-  --text: #ffffff;
-  --text-muted: #b6c2d9;
-  --primary: #4da3ff;
-  --primary-text: #04121f;
-  --danger: #ff6b6b;
-  --border: #3a4a6b;
+  /* Grafito: no deslumbra junto a Zoom o Teams. Ámbar solo para lo que habla;
+     azul solo para estados activo/detectado (se distinguen también por luminosidad). */
+  --bg: #0f1114;
+  --surface: #181b20;
+  --surface-side: #14171b;
+  --surface-raised: #22262d;
+  --border: #262a31;
+  --border-strong: #3a404b;
+  --text: #f2f0ea;
+  --text-muted: #a3a8b3;
+  --text-nav: #b4b9c3;
+  --accent: #ffb547;
+  --accent-press: #f0a52f;
+  --accent-text: #1a1206;
+  --accent-soft: #2a2418;
+  --live: #7ab8ff;
+  --live-soft: #1c2a3d;
+  --live-text: #a9d0ff;
+  --warn-bg: #221d14;
+  --warn-border: #4a3b1f;
+  --warn-text: #d9cdb6;
+  --danger: #ffa597;
+  --danger-border: #6b3b36;
+  --danger-bg: rgba(255, 165, 151, 0.12);
+
+  --radius-s: 10px;
+  --radius-m: 14px;
+  --radius-l: 18px;
+
+  --font-display: 'Bricolage Grotesque Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-text: 'Atkinson Hyperlegible', 'Segoe UI', system-ui, sans-serif;
+
   color-scheme: dark;
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font-text);
+  -webkit-font-smoothing: antialiased;
 }
 * {
   box-sizing: border-box;
@@ -25,11 +48,31 @@ body {
   background: var(--bg);
   color: var(--text);
   font-size: 16px;
+  line-height: 1.45;
+}
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
 }
 :focus-visible {
-  outline: 3px solid var(--primary);
-  outline-offset: 2px;
+  outline: 3px solid var(--live);
+  outline-offset: 3px;
 }
-button {
+button,
+input,
+select {
   font: inherit;
+}
+::selection {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

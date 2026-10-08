@@ -6,6 +6,10 @@ directories:
 files:
   - out/**
   - package.json
+# synth.ps1 se ejecuta con powershell.exe: debe quedar fuera del asar.
+extraResources:
+  - from: resources/tts
+    to: tts
 win:
   target: nsis
   icon: resources/icon.png

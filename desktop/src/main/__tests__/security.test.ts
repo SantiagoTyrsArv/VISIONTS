@@ -27,4 +27,9 @@ describe('allowPermission', () => {
     expect(allowPermission('geolocation', 'app://senavoz/', undefined)).toBe(false);
     expect(allowPermission('notifications', 'app://senavoz/', undefined)).toBe(false);
   });
+
+  it('concede speaker-selection (setSinkId) solo a orígenes propios', () => {
+    expect(allowPermission('speaker-selection', 'app://senavoz/', undefined)).toBe(true);
+    expect(allowPermission('speaker-selection', 'https://evil.example/', undefined)).toBe(false);
+  });
 });

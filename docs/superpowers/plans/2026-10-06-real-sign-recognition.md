@@ -29,6 +29,7 @@
 ## Mapa de archivos
 
 - `desktop/package.json` — dependencia de MediaPipe.
+- `desktop/src/renderer/public/models/hand_landmarker.task` — modelo oficial local de detección de manos, servido por el protocolo de la UI y empaquetado en `out/renderer`.
 - `desktop/src/renderer/src/services/recognition/SignRecognizer.ts` — contrato y estado de reconocimiento/predicción.
 - `desktop/src/renderer/src/services/recognition/landmarks.ts` — transformación de landmarks a coordenadas normalizadas y secuencias temporales.
 - `desktop/src/renderer/src/services/recognition/MediaPipeSignRecognizer.ts` — creación del Hand Landmarker, ciclo de frames y clasificador opcional.
@@ -50,11 +51,13 @@
 **Archivos:** modificar `desktop/package.json`; crear `services/recognition/MediaPipeSignRecognizer.ts` y `MediaPipeSignRecognizer.test.ts`.
 
 - Añadir `@mediapipe/tasks-vision` como dependencia de runtime.
+- Incluir el artefacto Hand Landmarker en `src/renderer/public/models/hand_landmarker.task`; importar los WASM mediante URLs de Vite para copiarlos al build con sus nombres hash.
 - Construir el landmarker en modo VIDEO, limitar detección a dos manos y usar `requestVideoFrameCallback` cuando exista, con alternativa `requestAnimationFrame`.
 - Esperar a vídeo listo y dimensiones válidas; evitar inferencia concurrente; enviar los timestamps requeridos por VIDEO.
 - Emitir el estado de presencia de manos y el vector normalizado hacia el clasificador.
 - `stop()` cancela callback/frame pendiente, elimina listeners y llama `close()` al landmarker de forma idempotente.
 - Permitir inyectar fábrica de landmarker y scheduler para aislar dependencias del navegador en las pruebas.
+- Confirmar que `npm run build` genera `out/renderer/models/hand_landmarker.task` junto a los WASM locales.
 
 ### Task 3: Clasificador y configuración de modelo
 
