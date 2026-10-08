@@ -1,13 +1,13 @@
 # Arquitectura de SeñaVoz
 
-## Vista general (MVP + fases futuras)
+## Vista general
 
 ```mermaid
 flowchart LR
   subgraph Desktop["App de escritorio (Electron, Windows)"]
     subgraph Renderer["Renderer (React)"]
       Cam["getUserMedia\n(webcam)"]
-      Rec["MediaPipe Hand Landmarker\n(landmarks locales · clasificador pendiente)"]
+      Rec["MediaPipe Hand Landmarker\n(landmarks locales · GRU del usuario en memoria)"]
       Speech["SpeechService\n(voces de Windows + setSinkId)"]
       UI["React Router\nZustand + TanStack Query"]
       Cam --> Rec --> Speech
@@ -19,23 +19,21 @@ flowchart LR
   end
 
   subgraph Server["Backend (Docker)"]
-    API["FastAPI\n/auth /users /phrases"]
+    API["FastAPI\n/auth /users /phrases\n/samples /models"]
     DB[("PostgreSQL")]
-    Worker["Worker de entrenamiento\n(Fase 3)"]
+    Trainer["trainer (PyTorch)"]
     API --> DB
-    Worker --> DB
+    Trainer --> DB
   end
 
   VCable["Cable de audio virtual"]
   Meet["Reunión (Zoom/Meet/Teams)"]
 
   UI -- "HTTPS + JWT" --> API
-  Rec -. "F2: secuencias de landmarks (futuro)" .-> API
-  API -. "F3: modelo entrenado" .-> Rec
+  Rec -- "muestras (landmarks)" --> API
+  API -- "pesos GRU (memoria)" --> Rec
   Speech -- "setSinkId" --> VCable --> Meet
 ```
-
-Las líneas punteadas son fases futuras; el MVP implementa las sólidas.
 
 ## Estructura
 
@@ -67,30 +65,31 @@ Los errores de login son genéricos ("Correo o contraseña incorrectos"). Cuando
 
 ## Modelo de datos
 
-Implementado (migración `0001`): `users`, `refresh_tokens`, `phrases`.
+Migración `0001`: `users`, `refresh_tokens`, `phrases`. Migración `0002`: `sign_samples`, `sign_models`. Ambas tablas nuevas se borran en cascada con el usuario.
 
-### Tablas futuras (documentadas, **no implementadas**)
+**`sign_samples`** — ráfagas grabadas por el usuario para entrenar.
 
-**`sign_samples`** — muestras grabadas por el usuario para entrenar (Fase 2).
+| Columna    | Tipo            | Nota                                                                           |
+| ---------- | --------------- | ------------------------------------------------------------------------------ |
+| id         | UUID PK         |                                                                                |
+| user_id    | UUID FK → users | índice compuesto `(user_id, label)`                                            |
+| label      | varchar(50)     | `code` de una frase del catálogo o `neutral` (reposo)                          |
+| data       | bytea           | 30 × 126 `float32` little-endian (15.120 bytes), valores ≤ 2 en valor absoluto |
+| created_at | timestamptz     |                                                                                |
 
-| Columna    | Tipo               | Nota                                       |
-| ---------- | ------------------ | ------------------------------------------ |
-| id         | UUID PK            |                                            |
-| user_id    | UUID FK → users    |                                            |
-| phrase_id  | UUID FK → phrases  | etiqueta de la seña                        |
-| landmarks  | JSON / array float | 30 × 126, normalizado respecto a la muñeca |
-| created_at | timestamptz        |                                            |
+**`sign_models`** — entrenamientos por usuario; solo se conserva el último modelo listo.
 
-**`ml_models`** — modelos entrenados por usuario (Fase 3).
-
-| Columna    | Tipo            | Nota                                                              |
-| ---------- | --------------- | ----------------------------------------------------------------- |
-| id         | UUID PK         |                                                                   |
-| user_id    | UUID FK → users |                                                                   |
-| version    | int             | incremental por usuario                                           |
-| model_path | text            | ubicación del modelo exportado (formato por decidir en la Fase 3) |
-| metrics    | JSON            | accuracy, matriz de confusión, nº de muestras…                    |
-| created_at | timestamptz     |                                                                   |
+| Columna     | Tipo            | Nota                                                  |
+| ----------- | --------------- | ----------------------------------------------------- |
+| id          | UUID PK         |                                                       |
+| user_id     | UUID FK → users |                                                       |
+| status      | varchar(20)     | `queued` → `training` → `ready` o `failed`            |
+| labels      | JSON            | etiquetas con el mínimo de muestras, ordenadas        |
+| weights     | JSON            | formato `senavoz-gru-v1` (puertas r, z, n de PyTorch) |
+| metrics     | JSON            | `val_accuracy`, `per_label`, `samples`                |
+| error       | text            | motivo del fallo, visible para el usuario             |
+| created_at  | timestamptz     |                                                       |
+| finished_at | timestamptz     |                                                       |
 
 ## Decisiones
 
@@ -100,33 +99,23 @@ Implementado (migración `0001`): `users`, `refresh_tokens`, `phrases`.
 
 **Proceso main mínimo y aislado.** Main solo gestiona ventana, protocolo, permisos (solo cámara) y tokens. Toda la lógica de producto está en el renderer, con `contextIsolation` + `sandbox`. El preload expone una API de tres funciones.
 
-**Visión local.** MediaPipe Hand Landmarker ya detecta hasta dos manos en el renderer y produce landmarks sin enviar vídeo ni landmarks al backend. El archivo del detector y los WASM se empaquetan localmente. La clasificación de señas aún requiere un modelo entrenado y configurado; mientras no exista, la pantalla comunica que hay detección de manos, pero no activa una frase.
+**Visión local.** MediaPipe Hand Landmarker detecta hasta dos manos en el renderer y produce landmarks; nunca se envía vídeo. El archivo del detector y el WASM con SIMD se empaquetan localmente. Se clasifica uno de cada 3 frames para no cargar la CPU durante las reuniones.
 
 El artefacto de detección de manos incluido es el modelo oficial [Hand Landmarker](https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task); MediaPipe lo utiliza para extraer keypoints y no para clasificar señas del catálogo.
 
-**Entrenamiento en servidor.** Una red LSTM/GRU pequeña conviene entrenarla en lote. El servidor recibe muestras, entrena, evalúa y exporta un modelo versionado que la app descarga. Así el ciclo de mejora del modelo va separado del de publicación de la app.
+**Datos y modelo de señas.** Las muestras (solo landmarks, 30 × 126 por ráfaga) viven en el servidor asociadas a la cuenta, y el usuario puede borrarlas cuando quiera. El servicio `trainer` toma los entrenamientos en cola y entrena una GRU pequeña (126 → 64) con PyTorch CPU; la API no importa `torch`. La app ejecuta la GRU en TypeScript puro, verificada contra PyTorch con un fixture y sin runtimes de ML. Los pesos se piden con `no-store`, solo viven en memoria y se descartan al cerrar sesión. La clase `neutral` (reposo) nunca produce frase. Spec: `docs/superpowers/specs/2026-10-07-trained-sign-model-design.md`.
 
 **TTS pregenerado/cacheado.** Las frases son un conjunto cerrado y pequeño. Se pueden pregenerar con una voz de más calidad que la del sistema y reproducirlas localmente. `SpeechService` lo abstrae: `GeneratedSpeechService` reproduce el audio generado con las voces de Windows (precargado para todo el catálogo) y, solo fuera del Modo reunión, cae a `WebSpeechService` si la síntesis falla.
 
 **Audio hacia la reunión (Modo reunión).** El main genera WAV con las voces OneCore de Windows (`resources/tts/synth.ps1`, WinRT vía PowerShell) y los guarda en `userData/tts-cache/` por voz + velocidad + texto. El renderer los reproduce con `HTMLAudioElement.setSinkId()` hacia VB-Cable ("CABLE Input"), que la reunión usa como micrófono ("CABLE Output"). En Modo reunión la voz nunca sale por los altavoces. La ventana se vuelve compacta y siempre visible, y Ctrl+Alt+1…9 funcionan con la reunión enfocada. Spec: `docs/superpowers/specs/2026-10-07-meeting-mode-design.md`.
 
-**Interfaces desacopladas.** `SignRecognizer` y `SpeechService` son el contrato entre la UI y las capacidades cambiantes. `MediaPipeSignRecognizer` implementa la detección de manos y admite un clasificador temporal opcional; la pantalla de cámara no depende directamente de MediaPipe.
+**Interfaces desacopladas.** `SignRecognizer` y `SpeechService` son el contrato entre la UI y las capacidades cambiantes. `MediaPipeSignRecognizer` implementa la detección de manos, admite cambiar de clasificador sin reiniciar la cámara y emite los frames normalizados (los usa la pantalla Entrenar); la pantalla de cámara no depende directamente de MediaPipe.
 
 ## Roadmap
 
-### Fase 2 — Captura de datos
+### Modelo de señas por usuario — hecho
 
-- **Base de visión implementada:** `@mediapipe/tasks-vision` (HandLandmarker, modo VIDEO) sobre la webcam, en el renderer; modelo del detector y WASM empaquetados con la app.
-- Pendiente: grabación en ráfaga con cuenta atrás (3‑2‑1, 30 frames, pausa, repetir hasta N muestras por frase).
-- Secuencias de **30 frames × 126 valores** (2 manos × 21 puntos × xyz), normalizadas respecto a la muñeca (mano ausente → ceros). La normalización TypeScript pura y la ventana temporal ya están implementadas.
-- Subida al backend: `POST /samples` → tabla `sign_samples`.
-
-### Fase 3 — Entrenamiento e inferencia
-
-- Pendiente: entrenar/validar un modelo de señas y configurar mapeo de etiquetas a códigos de frase. El adaptador de clasificador aplica umbral y cooldown, pero no hay pesos incluidos todavía.
-- Worker de entrenamiento (LSTM/GRU pequeña) por usuario, con clase **"neutral"** para el reposo, umbral de confianza y _cooldown_ entre detecciones para evitar repeticiones.
-- Registro en `ml_models` y endpoint de descarga.
-- Inferencia en el renderer implementando `SignRecognizer` sin tocar la UI. **Dirección, no decisión:** TF.js u ONNX Runtime Web.
+Ver la spec `docs/superpowers/specs/2026-10-07-trained-sign-model-design.md` y el plan `docs/superpowers/plans/2026-10-07-trained-sign-model.md`.
 
 ### Modo reunión — hecho
 
