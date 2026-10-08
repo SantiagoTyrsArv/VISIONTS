@@ -75,3 +75,10 @@ export const IconSpeaker = (p: Props) => (
     <path d="M15.5 8.5a5 5 0 010 7" />
   </Svg>
 );
+/** Entrenar: una mano abierta. */
+export const IconTrain = (p: Props) => (
+  <Svg {...p}>
+    <path d="M7 11V6a1.5 1.5 0 013 0v5M10 10V4.5a1.5 1.5 0 013 0V10M13 10V5.5a1.5 1.5 0 013 0V12" />
+    <path d="M16 12V9a1.5 1.5 0 013 0v5a7 7 0 01-7 7h-1a6 6 0 01-5-2.7L3.6 14.6a1.5 1.5 0 012.4-1.8L7 14" />
+  </Svg>
+);

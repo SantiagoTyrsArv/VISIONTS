@@ -9,13 +9,14 @@ import { resolveMeetingOutput } from '@/services/audio/outputDevice';
 import { useSettings } from '@/store/settings';
 import { useSignModel } from '@/store/signModel';
 import { Brand } from '@/ui/Brand';
-import { IconCamera, IconMeeting, IconPhrases, IconSettings } from '@/ui/icons';
+import { IconCamera, IconMeeting, IconPhrases, IconSettings, IconTrain } from '@/ui/icons';
 
 import styles from './routes.module.css';
 
 const links = [
   { to: '/frases', label: 'nav.home', Icon: IconPhrases },
   { to: '/camara', label: 'nav.camera', Icon: IconCamera },
+  { to: '/entrenar', label: 'nav.train', Icon: IconTrain },
   { to: '/ajustes', label: 'nav.settings', Icon: IconSettings },
 ] as const;
 
