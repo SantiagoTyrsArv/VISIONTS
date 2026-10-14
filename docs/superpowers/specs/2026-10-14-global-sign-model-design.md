@@ -99,7 +99,7 @@ Carpeta nueva **`training/`** en la raíz del repo, fuera del backend desplegado
 
 - Routers `samples.py` y `models.py`, servicios `sample_service.py` y `model_service.py`, `app/training/` (`data.py`, `worker.py` y `errors.py` se borran; `model.py` y `train.py` se mueven a `training/`), esquemas y límites de peticiones asociados.
 - Tests `test_samples.py`, `test_models_api.py`, `test_worker.py`; `test_training.py` se mueve a `training/`.
-- Migración **`0003`**: elimina `sign_samples` y `sign_models` (con `downgrade` que las recrea).
+- Migración **`0004`**: elimina `sign_samples` y `sign_models` (con `downgrade` que las recrea).
 - `Dockerfile` vuelve a un único objetivo sin PyTorch; `requirements-train.txt` sale del backend; el servicio `trainer` sale de `docker-compose.yml`.
 
 **Documentación:** README (uso, endpoints, tests, qué se verificó), `ARCHITECTURE.md` (diagrama, modelo de datos y decisión "Datos y modelo de señas") y atribución de LSC-54 (autores, DOI 10.57760/sciencedb.25639, CC BY-NC 4.0) en el README y en Ajustes, en una línea de créditos.
@@ -116,7 +116,7 @@ Carpeta nueva **`training/`** en la raíz del repo, fuera del backend desplegado
 - **Paridad de la GRU:** se mantiene la prueba actual frente a PyTorch.
 - **Entrenamiento:** determinismo con semilla fija, validación por persona (ninguna persona en ambos lados) y exportación limitada a señas ≥ 80 %, con datos sintéticos en pytest.
 - **App:** el store carga el modelo empaquetado y pasa a `error` con un JSON inválido; distintivo "Seña" en Frases; estado del modelo en Cámara y Reunión; la ventana temporal toma frames a intervalo Δt y rellena la mano perdida; desaparecen la ruta Entrenar y la sección de datos de entrenamiento.
-- **Backend:** la migración `0003` sube y baja; los tests restantes pasan; `/samples` y `/models` responden 404.
+- **Backend:** la migración `0004` sube y baja; los tests restantes pasan; `/samples` y `/models` responden 404.
 - **Manual** (el usuario, con webcam real): hacer cada seña incluida siguiendo un vídeo de referencia (INSOR o LSC-54) en Cámara y en Modo reunión; comprobar que se dice la frase correcta y que con las manos quietas o bajadas no se dice nada. Se documenta el resultado en el README como verificado o no verificado.
 
 ## Fuera de alcance
