@@ -64,7 +64,8 @@ La normalización se implementa en `landmarks.ts` y en `training/preprocess.py`.
 
 Carpeta nueva **`training/`** en la raíz del repo, fuera del backend desplegado:
 
-- `preprocess.py`: lee los JSON de LSC-54 (ruta como argumento; el dataset no se versiona), aplica §2 y genera tensores 30×126. Solo usa `rep_0` de cada vídeo: las 44 copias aumentadas son traslaciones horizontales, idénticas tras normalizar respecto a la muñeca, y falsearían la validación.
+- **Fuente de datos** (enmienda 2026-10-19, ver `training/FINDINGS.md`): no se usan los JSON de LSC-54 (51 GB, extraídos con MediaPipe Holistic). `extract.py` extrae los landmarks de los vídeos crudos (~970 MB) con el **mismo Hand Landmarker y las mismas opciones que la app**, y los guarda en una caché `.npy`. Así el entrenamiento ve exactamente los puntos que verá la app.
+- `preprocess.py` aplica §2 y `lsc54.py` convierte la caché en tensores 30×126 (el dataset no se versiona).
 - `model.py` y `train.py`: se **mueven** desde `backend/app/training/`, sin cambios en la arquitectura (GRU 126 → 64 + capa lineal).
 - **Validación por persona:** se separa a un grupo de personas (≈ 20 %) para validar, nunca muestras sueltas de las mismas personas.
 - **Aumento de datos** (además del actual de escala, ruido y desplazamiento):
@@ -121,4 +122,4 @@ Carpeta nueva **`training/`** en la raíz del repo, fuera del backend desplegado
 
 ## Fuera de alcance
 
-Despliegue (subproyecto 2), grabar datos propios, personalización por usuario, servir el modelo desde el backend, frases personalizadas, lenguaje continuo y nuevas lenguas de señas.
+Despliegue (subproyecto 2), preentrenar con datasets de otras lenguas de señas (mejora opcional si la precisión se queda corta), grabar datos propios, personalización por usuario, servir el modelo desde el backend, frases personalizadas, lenguaje continuo y nuevas lenguas de señas.
