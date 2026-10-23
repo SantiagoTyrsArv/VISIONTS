@@ -16,8 +16,9 @@ class Settings(BaseSettings):
     # NoDecode: pydantic-settings no intenta parsear JSON; se separa por comas.
     cors_origins: Annotated[list[str], NoDecode] = []
     rate_limit_login: str = "5/minute"
-    # Por cuenta (correo), además de por IP: la IP tras el proxy se puede falsificar.
-    rate_limit_login_account: str = "10/hour"
+    # Fallos de login por cuenta (correo), además del límite por IP: la IP tras el proxy se puede
+    # falsificar. Un acierto reinicia la cuenta.
+    rate_limit_login_account: str = "20/hour"
     rate_limit_register: str = "10/minute"
     rate_limit_refresh: str = "30/minute"
 

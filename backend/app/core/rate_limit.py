@@ -18,10 +18,24 @@ def user_or_ip(request: Request) -> str:
     return get_remote_address(request)
 
 
-def account_attempt_allowed(scope: str, account: str, rate: str) -> bool:
-    """Cuenta un intento sobre una cuenta (p. ej. el correo del login) y dice si aún cabe en
-    `rate`. A diferencia del límite por IP, no depende de X-Forwarded-For, que el cliente puede
-    falsificar detrás de un proxy: frena la fuerza bruta contra una cuenta concreta."""
-    if not limiter.enabled:
-        return True
-    return limiter.limiter.hit(parse(rate), scope, account.strip().lower())
+
+# Fallos de login por cuenta (correo). A diferencia del límite por IP, no depende de
+# X-Forwarded-For, que el cliente puede falsificar detrás de un proxy. Solo cuentan los fallos y un
+# acierto los borra: así un tercero necesita `rate` fallos para bloquear una cuenta (riesgo aceptado,
+# ver README) y quien entra a menudo no se bloquea a sí mismo.
+def _account_key(email: str) -> str:
+    return email.strip().lower()
+
+
+def login_allowed(email: str, rate: str) -> bool:
+    return not limiter.enabled or limiter.limiter.test(parse(rate), "login-fail", _account_key(email))
+
+
+def record_login_failure(email: str, rate: str) -> None:
+    if limiter.enabled:
+        limiter.limiter.hit(parse(rate), "login-fail", _account_key(email))
+
+
+def clear_login_failures(email: str, rate: str) -> None:
+    if limiter.enabled:
+        limiter.limiter.clear(parse(rate), "login-fail", _account_key(email))

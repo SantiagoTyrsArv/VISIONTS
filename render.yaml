@@ -7,10 +7,10 @@ services:
     plan: free
     region: virginia
     branch: main
-    # Solo los cambios en backend/ redespliegan; rutas de Docker relativas a la raíz del repo.
+    # Solo los cambios en backend/ redespliegan; Render resuelve las rutas de Docker desde rootDir.
     rootDir: backend
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /health
     # Despliega cada commit de main solo si pasan los checks de GitHub Actions (ci.yml).
     autoDeployTrigger: checksPass
