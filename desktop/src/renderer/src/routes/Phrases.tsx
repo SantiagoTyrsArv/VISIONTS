@@ -1,9 +1,12 @@
+import { useShallow } from 'zustand/react/shallow';
+
 import type { Phrase } from '@/api/types';
 import { usePhrases } from '@/api/usePhrases';
 import { usePhraseShortcuts } from '@/hooks/usePhraseShortcuts';
 import { t } from '@/i18n';
 import { speechService } from '@/services/speech';
 import { usePlayback } from '@/store/playback';
+import { signLabels, useSignModel } from '@/store/signModel';
 import { Button } from '@/ui/Button';
 import { IconSpeaker } from '@/ui/icons';
 import { PhraseCard } from '@/ui/PhraseCard';
@@ -16,6 +19,7 @@ export default function Phrases() {
   const { data, isPending, isError, refetch, isRefetching } = usePhrases();
   const lastText = usePlayback((s) => s.lastText);
   const playing = usePlayback((s) => s.playing);
+  const signs = useSignModel(useShallow(signLabels));
   usePhraseShortcuts(data, speak);
 
   return (
@@ -69,6 +73,7 @@ export default function Phrases() {
               text={p.text_es}
               shortcut={i < 9 ? i + 1 : undefined}
               active={p.text_es === lastText}
+              hasSign={signs.includes(p.code)}
               onClick={() => speak(p)}
             />
           ))}

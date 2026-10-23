@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Phrases from '@/routes/Phrases';
 import { usePlayback } from '@/store/playback';
+import { useSignModel } from '@/store/signModel';
 
 const speak = vi.fn();
 const stop = vi.fn();
@@ -31,6 +32,24 @@ beforeEach(() => {
 });
 
 describe('pantalla de frases', () => {
+  it('marca con "Seña" solo las frases que el modelo reconoce', async () => {
+    useSignModel.setState({
+      status: 'ready',
+      classifier: null,
+      labels: ['yes', 'neutral'],
+      valAccuracy: 0.9,
+    });
+    list.mockResolvedValue([
+      { id: '1', code: 'yes', text_es: 'Sí', is_default: true },
+      { id: '2', code: 'no', text_es: 'No', is_default: true },
+    ]);
+    renderScreen();
+    const yes = await screen.findByRole('button', { name: 'Reproducir en voz alta: Sí' });
+    expect(within(yes).getByText('Seña')).toBeInTheDocument();
+    const no = screen.getByRole('button', { name: 'Reproducir en voz alta: No' });
+    expect(within(no).queryByText('Seña')).toBeNull();
+  });
+
   it('clic en una tarjeta reproduce la frase', async () => {
     list.mockResolvedValue([{ id: '1', code: 'hello', text_es: 'Hola', is_default: true }]);
     renderScreen();

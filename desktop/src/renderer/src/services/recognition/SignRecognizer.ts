@@ -6,9 +6,6 @@ export type RecognitionStatus = {
   modelAvailable: boolean;
 };
 
-/** Frame normalizado (126 valores) tal como lo ve el clasificador. */
-export type LandmarkFrame = { values: number[]; handsDetected: boolean };
-
 export type Unsubscribe = () => void;
 
 export interface SignRecognizer {

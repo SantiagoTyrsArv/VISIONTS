@@ -2,9 +2,16 @@ import { t } from '@/i18n';
 
 import styles from './ui.module.css';
 
-type Props = { text: string; shortcut?: number; active?: boolean; onClick: () => void };
+type Props = {
+  text: string;
+  shortcut?: number;
+  active?: boolean;
+  /** La frase tiene seña en el modelo: se puede decir haciéndola en Cámara. */
+  hasSign?: boolean;
+  onClick: () => void;
+};
 
-export function PhraseCard({ text, shortcut, active = false, onClick }: Props) {
+export function PhraseCard({ text, shortcut, active = false, hasSign = false, onClick }: Props) {
   return (
     <button
       type="button"
@@ -21,6 +28,7 @@ export function PhraseCard({ text, shortcut, active = false, onClick }: Props) {
         <span aria-hidden />
       )}
       <span className={styles.cardText}>{text}</span>
+      {hasSign ? <span className={styles.signBadge}>{t('home.hasSign')}</span> : null}
     </button>
   );
 }

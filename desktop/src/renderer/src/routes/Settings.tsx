@@ -9,7 +9,6 @@ import { Button } from '@/ui/Button';
 
 import styles from './routes.module.css';
 import { MeetingSection } from './settings/MeetingSection';
-import { TrainingDataSection } from './settings/TrainingDataSection';
 import { VoiceSection } from './settings/VoiceSection';
 
 export default function Settings() {
@@ -62,7 +61,10 @@ export default function Settings() {
         </section>
       ) : null}
 
-      <TrainingDataSection />
+      <section className={styles.section} aria-label={t('settings.creditsTitle')}>
+        <h2 className={styles.sectionTitle}>{t('settings.creditsTitle')}</h2>
+        <p className={styles.muted}>{t('settings.credits')}</p>
+      </section>
 
       <section className={styles.section} aria-label={t('settings.profile')}>
         <div className={styles.row}>

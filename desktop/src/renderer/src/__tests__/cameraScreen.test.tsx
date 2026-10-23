@@ -64,6 +64,12 @@ function renderScreen(): RenderResult {
   );
 }
 
+// La pantalla muestra el estado (role=status) antes de crear el reconocedor: hay que esperar
+// a que arranque para que emitSign llegue a la pantalla.
+async function recognizerStarted(): Promise<void> {
+  await vi.waitFor(() => expect(recognizerMock.start).toHaveBeenCalled());
+}
+
 beforeEach(() => {
   speak.mockReset();
   stop.mockReset();
@@ -72,17 +78,14 @@ beforeEach(() => {
   recognizerMock.emitSign.mockReset();
   recognizerMock.start.mockReset();
   recognizerMock.stop.mockReset();
-  useSignModel.getState().clear();
-  useSignModel.setState({ status: 'none' });
+  useSignModel.setState({ status: 'error', classifier: null, labels: [], valAccuracy: null });
 });
 
 describe('pantalla de cámara', () => {
-  it('muestra que falta el modelo y reproduce una predicción válida del reconocedor', async () => {
+  it('reproduce una predicción válida del reconocedor', async () => {
     openCamera.mockResolvedValue(fakeStream);
     renderScreen();
-    expect(
-      await screen.findByText(/Detector activo\. Graba tus señas/),
-    ).toBeInTheDocument();
+    await recognizerStarted();
 
     await act(async () => {
       recognizerMock.emitSign({ code: 'hello', confidence: 0.91 });
@@ -95,7 +98,7 @@ describe('pantalla de cámara', () => {
   it('ignora códigos de seña que no pertenecen al catálogo', async () => {
     openCamera.mockResolvedValue(fakeStream);
     renderScreen();
-    await screen.findByText(/Detector activo/);
+    await recognizerStarted();
 
     await act(async () => {
       recognizerMock.emitSign({ code: 'not-in-catalog', confidence: 0.99 });
@@ -120,49 +123,34 @@ describe('pantalla de cámara', () => {
   it('al salir de la pantalla apaga la cámara', async () => {
     openCamera.mockResolvedValue(fakeStream);
     const { unmount } = renderScreen();
-    await screen.findByText(/Detector activo/);
+    await recognizerStarted();
     unmount();
     await vi.waitFor(() => expect(stop).toHaveBeenCalled());
     expect(recognizerMock.stop).toHaveBeenCalledTimes(1);
   });
 
-  it('panel de estado: sin modelo, con enlace a Entrenar', async () => {
+  it('con el modelo en error, la cámara avisa y no hay enlace a Entrenar', async () => {
+    useSignModel.setState({ status: 'error', classifier: null, labels: [], valAccuracy: null });
     openCamera.mockResolvedValue(fakeStream);
     renderScreen();
-    expect(await screen.findByText('Aún no tienes un modelo')).toBeInTheDocument();
-    expect(screen.getByText('Sin modelo')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Ir a Entrenar' })).toHaveAttribute(
-      'href',
-      '#/entrenar',
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Reconocimiento de señas no disponible',
     );
+    expect(screen.getAllByText('Reconocimiento de señas no disponible')).toHaveLength(2);
+    expect(screen.queryByRole('link', { name: /entrenar/i })).toBeNull();
   });
 
-  it('con un modelo listo muestra su precisión y oculta el aviso', async () => {
-    useSignModel.setState({
-      status: 'ready',
-      metrics: { val_accuracy: 0.92, per_label: {}, samples: {} },
-      job: null,
-    });
+  it('con el modelo listo muestra cuántas señas reconoce', async () => {
+    useSignModel.setState({ status: 'ready', labels: ['hello', 'neutral'] });
     openCamera.mockResolvedValue(fakeStream);
     renderScreen();
-    expect(await screen.findByText('Listo · precisión 92 %')).toBeInTheDocument();
-    expect(screen.queryByText('Aún no tienes un modelo')).not.toBeInTheDocument();
-  });
-
-  it('mientras entrena lo indica', async () => {
-    useSignModel.setState({
-      status: 'none',
-      job: { id: 'm1', status: 'training', error: null, created_at: '' },
-    });
-    openCamera.mockResolvedValue(fakeStream);
-    renderScreen();
-    expect(await screen.findByText('Entrenando…')).toBeInTheDocument();
+    expect(await screen.findByText('Modelo LSC · 1 señas')).toBeInTheDocument();
   });
 
   it('las señas reconocidas aparecen en "Últimas señas"', async () => {
     openCamera.mockResolvedValue(fakeStream);
     renderScreen();
-    await screen.findByText(/Detector activo/);
+    await recognizerStarted();
     await act(async () => {
       recognizerMock.emitSign({ code: 'hello', confidence: 0.9 });
     });

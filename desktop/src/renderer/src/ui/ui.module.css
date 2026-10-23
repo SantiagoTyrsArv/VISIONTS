@@ -254,6 +254,16 @@
   font-size: 24px;
   line-height: 1.2;
 }
+/* Distintivo de las frases que el modelo reconoce como seña. */
+.signBadge {
+  justify-self: start;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  opacity: 0.8;
+}
 /* Atajo de teclado dibujado como una tecla. */
 .shortcut {
   min-width: 30px;

@@ -20,7 +20,7 @@ vi.mock('@/services/speech', () => ({
   },
 }));
 vi.mock('@/hooks/useSignRecognition', () => ({
-  modelStatusText: () => 'Sin modelo',
+  modelStatusText: () => 'Reconocimiento de señas no disponible',
   useSignRecognition: () => ({
     cam: { kind: 'ready' },
     cameras: [],
@@ -29,7 +29,7 @@ vi.mock('@/hooks/useSignRecognition', () => ({
     retry: vi.fn(),
     selectCamera: vi.fn(),
   }),
-  visionMessageKey: () => 'camera.handsWithoutModel',
+  visionMessageKey: () => 'camera.modelError',
 }));
 vi.mock('@/api/endpoints', () => ({
   phrasesApi: {

@@ -1,112 +1,58 @@
 import { create } from 'zustand';
 
-import { modelsApi } from '@/api/endpoints';
-import type { ModelJob, ModelMetrics } from '@/api/types';
-import { GruModel, InvalidModelError } from '@/services/recognition/GruModel';
+import { GruModel } from '@/services/recognition/GruModel';
 import { createSignClassifier, type SignClassifier } from '@/services/recognition/SignClassifier';
-import { useSession } from '@/store/session';
+import { FRAME_INTERVAL_MS, SEQUENCE_LENGTH } from '@/services/recognition/landmarks';
 
-export const MODEL_POLL_MS = 3000;
-/** Reintento tras un fallo de red, para no quedarse sin modelo hasta reiniciar. */
-export const MODEL_RETRY_MS = 10_000;
 const NEUTRAL = 'neutral';
-
-type ModelStatus = 'unknown' | 'none' | 'ready' | 'error';
+// Una seña puede seguir dentro de la ventana (≈ 2 s) tras reconocerse: no se repite antes.
+const COOLDOWN_MS = SEQUENCE_LENGTH * FRAME_INTERVAL_MS;
 
 type SignModelState = {
-  status: ModelStatus;
+  status: 'loading' | 'ready' | 'error';
   classifier: SignClassifier | null;
-  modelId: string | null;
   labels: string[];
-  metrics: ModelMetrics | null;
-  /** Último entrenamiento posterior al modelo listo (en cola, entrenando o fallido). */
-  job: ModelJob | null;
-  refresh: () => Promise<void>;
-  clear: () => void;
+  valAccuracy: number | null;
+  load: (loader?: () => Promise<unknown>) => Promise<void>;
 };
 
-export const isTraining = (job: ModelJob | null): boolean =>
-  job?.status === 'queued' || job?.status === 'training';
+// Import dinámico: el JSON (≈ 300 KB) no retrasa el primer render. Lo genera training/ y no
+// existe en un clon recién hecho: con glob su ausencia no rompe typecheck, tests ni `npm run dev`
+// (la app queda en "no disponible"); `build:win` sí lo exige (scripts/check-sign-model.mjs).
+const modelChunks = import.meta.glob<unknown>('../assets/sign-model.json', { import: 'default' });
+const bundledModel = async (): Promise<unknown> => {
+  const chunk = Object.values(modelChunks)[0];
+  if (!chunk) throw new Error('sign-model.json no está en la app');
+  return chunk();
+};
 
-const initial = {
-  status: 'unknown' as ModelStatus,
+/** Etiquetas que producen frase (todas salvo neutral). */
+export const signLabels = (s: Pick<SignModelState, 'labels'>): string[] =>
+  s.labels.filter((l) => l !== NEUTRAL);
+
+/** Modelo LSC global, empaquetado con la app: se carga una vez, sin red ni sesión. */
+export const useSignModel = create<SignModelState>()((set) => ({
+  status: 'loading',
   classifier: null,
-  modelId: null,
   labels: [],
-  metrics: null,
-  job: null,
-};
-
-// Generación: una respuesta que llega tras clear() (cierre de sesión) se descarta.
-let generation = 0;
-let pollTimer: ReturnType<typeof setTimeout> | null = null;
-
-/** Modelo de señas del usuario, solo en memoria: nunca se escribe en disco. */
-export const useSignModel = create<SignModelState>()((set, get) => ({
-  ...initial,
-
-  async refresh() {
-    const gen = generation;
-    if (pollTimer) clearTimeout(pollTimer);
-    pollTimer = null;
-    let job: ModelJob | null = get().job;
-    let retry = false;
+  valAccuracy: null,
+  async load(loader = bundledModel) {
     try {
-      const { ready, latest } = await modelsApi.status();
-      if (gen !== generation) return;
-      job = latest;
-      set({ job });
-      if (!ready) {
-        set({ status: 'none', classifier: null, modelId: null, labels: [], metrics: null });
-      } else if (ready.id !== get().modelId) {
-        try {
-          const model = GruModel.fromJson(await modelsApi.weights());
-          if (gen !== generation) return;
-          // `neutral` no está en el mapa: nunca se convierte en frase.
-          const labelToCode = Object.fromEntries(
-            model.labels.filter((l) => l !== NEUTRAL).map((l) => [l, l]),
-          );
-          set({
-            status: 'ready',
-            classifier: createSignClassifier(model, labelToCode),
-            modelId: ready.id,
-            labels: [...model.labels],
-            metrics: ready.metrics,
-          });
-        } catch (e) {
-          if (gen !== generation) return;
-          if (e instanceof InvalidModelError) {
-            set({ status: 'error', classifier: null, modelId: null, labels: [], metrics: null });
-          } else {
-            // Sin red al bajar los pesos: se sigue con el modelo anterior y se reintenta.
-            retry = true;
-          }
-        }
-      }
+      const json = await loader();
+      const model = GruModel.fromJson(json);
+      // Las etiquetas son los `code` de las frases; `neutral` no está en el mapa.
+      const labelToCode = Object.fromEntries(
+        model.labels.filter((l) => l !== NEUTRAL).map((l) => [l, l]),
+      );
+      const acc = (json as { metrics?: { val_accuracy?: unknown } }).metrics?.val_accuracy;
+      set({
+        status: 'ready',
+        classifier: createSignClassifier(model, labelToCode, { cooldownMs: COOLDOWN_MS }),
+        labels: [...model.labels],
+        valAccuracy: typeof acc === 'number' ? acc : null,
+      });
     } catch {
-      // Sin red: se conserva el estado actual y se reintenta.
-      retry = true;
+      set({ status: 'error', classifier: null, labels: [], valAccuracy: null });
     }
-    if (gen !== generation) return;
-    const delay = isTraining(job) ? MODEL_POLL_MS : retry ? MODEL_RETRY_MS : null;
-    if (delay !== null) {
-      // Un solo temporizador aunque haya varias consultas a la vez.
-      if (pollTimer) clearTimeout(pollTimer);
-      pollTimer = setTimeout(() => void get().refresh(), delay);
-    }
-  },
-
-  clear() {
-    generation += 1;
-    if (pollTimer) clearTimeout(pollTimer);
-    pollTimer = null;
-    set(initial);
   },
 }));
-
-// Al cerrar sesión (o si caduca), el modelo se descarta de la memoria.
-useSession.subscribe((state, prev) => {
-  if (prev.status === 'authenticated' && state.status !== 'authenticated') {
-    useSignModel.getState().clear();
-  }
-});

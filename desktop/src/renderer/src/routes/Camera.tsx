@@ -1,17 +1,12 @@
 import { useRef, useState } from 'react';
 import type { JSX } from 'react';
-import { Link } from 'react-router';
 import { useShallow } from 'zustand/react/shallow';
 
 import { usePhrases } from '@/api/usePhrases';
-import {
-  modelStatusText,
-  useSignRecognition,
-  visionMessageKey,
-} from '@/hooks/useSignRecognition';
+import { modelStatusText, useSignRecognition, visionMessageKey } from '@/hooks/useSignRecognition';
 import { t } from '@/i18n';
 import { speechService } from '@/services/speech';
-import { isTraining, useSignModel } from '@/store/signModel';
+import { useSignModel } from '@/store/signModel';
 import { Button } from '@/ui/Button';
 
 import styles from './routes.module.css';
@@ -42,11 +37,8 @@ export default function Camera(): JSX.Element {
   );
   const ready = cam.kind === 'ready';
   const hands = recognition?.handsDetected ?? false;
-  const model = useSignModel(
-    useShallow((s) => ({ status: s.status, metrics: s.metrics, job: s.job })),
-  );
+  const model = useSignModel(useShallow((s) => ({ status: s.status, labels: s.labels })));
   const modelReady = model.status === 'ready';
-  const training = isTraining(model.job);
 
   return (
     <div className={styles.page}>
@@ -109,16 +101,6 @@ export default function Camera(): JSX.Element {
               <Status ok={modelReady} label={modelStatusText(model)} />
             </p>
           </section>
-
-          {ready && !modelReady && !training ? (
-            <section className={styles.warnPanel}>
-              <h2>{t('camera.noModelTitle')}</h2>
-              <p>{t('camera.noModelBody')}</p>
-              <Link to="/entrenar" className={styles.linkButton}>
-                {t('camera.toPhrases')}
-              </Link>
-            </section>
-          ) : null}
 
           <section className={styles.panel}>
             <h2 className={styles.panelTitle} id="recent-title">

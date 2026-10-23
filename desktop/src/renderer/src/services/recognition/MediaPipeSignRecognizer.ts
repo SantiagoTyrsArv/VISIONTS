@@ -2,10 +2,9 @@ import { HandLandmarker, type HandLandmarkerResult } from '@mediapipe/tasks-visi
 import simdLoaderUrl from '@mediapipe/tasks-vision/vision_wasm_internal.js?url';
 import simdWasmUrl from '@mediapipe/tasks-vision/vision_wasm_internal.wasm?url';
 
-import { LandmarkSequenceBuffer, type DetectedHand } from './landmarks';
+import { FRAME_INTERVAL_MS, LandmarkSequenceBuffer, type DetectedHand } from './landmarks';
 import type { SignClassifier } from './SignClassifier';
 import type {
-  LandmarkFrame,
   RecognitionStatus,
   RecognizedSign,
   SignRecognizer,
@@ -14,9 +13,6 @@ import type {
 
 export type Landmarker = Pick<HandLandmarker, 'detectForVideo' | 'close'>;
 type FrameCallback = (timestamp: number) => void;
-
-/** Se clasifica uno de cada 3 frames para no cargar la CPU durante las reuniones. */
-export const INFERENCE_STRIDE = 3;
 
 export type FrameScheduler = {
   request(video: HTMLVideoElement, callback: FrameCallback): number;
@@ -63,7 +59,7 @@ export type MediaPipeRecognizerOptions = {
   classifier?: SignClassifier | null;
 };
 
-/** Local hand landmarks plus an optional trained sign classifier. */
+/** Detección local de manos y clasificación de señas con el modelo empaquetado. */
 export class MediaPipeSignRecognizer implements SignRecognizer {
   private readonly createLandmarker: () => Promise<Landmarker>;
   private readonly scheduler: FrameScheduler;
@@ -71,8 +67,7 @@ export class MediaPipeSignRecognizer implements SignRecognizer {
   private readonly sequence = new LandmarkSequenceBuffer();
   private readonly signListeners = new Set<(sign: RecognizedSign) => void>();
   private readonly statusListeners = new Set<(status: RecognitionStatus) => void>();
-  private readonly frameListeners = new Set<(frame: LandmarkFrame) => void>();
-  private framesSinceInference = INFERENCE_STRIDE;
+  private lastSampleAt = -Infinity;
   private landmarker: Landmarker | null = null;
   private frameId: number | null = null;
   private running = false;
@@ -102,7 +97,7 @@ export class MediaPipeSignRecognizer implements SignRecognizer {
     const generation = this.generation;
     this.sequence.clear();
     this.previousTimestamp = -1;
-    this.framesSinceInference = INFERENCE_STRIDE;
+    this.lastSampleAt = -Infinity;
     this.publishStatus({
       phase: 'initializing',
       handsDetected: false,
@@ -139,6 +134,7 @@ export class MediaPipeSignRecognizer implements SignRecognizer {
     this.landmarker = null;
     landmarker?.close();
     this.sequence.clear();
+    this.lastSampleAt = -Infinity;
   }
 
   onSign(callback: (sign: RecognizedSign) => void): Unsubscribe {
@@ -156,11 +152,6 @@ export class MediaPipeSignRecognizer implements SignRecognizer {
   setClassifier(classifier: SignClassifier | null): void {
     this.classifier = classifier;
     this.publishStatus({ ...this.status, modelAvailable: !!classifier });
-  }
-
-  onFrame(callback: (frame: LandmarkFrame) => void): Unsubscribe {
-    this.frameListeners.add(callback);
-    return () => this.frameListeners.delete(callback);
   }
 
   private scheduleNextFrame(): void {
@@ -188,9 +179,7 @@ export class MediaPipeSignRecognizer implements SignRecognizer {
       this.previousTimestamp = monotonicTimestamp;
       const result = landmarker.detectForVideo(this.video, monotonicTimestamp);
       const hands = toDetectedHands(result);
-      const values = this.sequence.add(hands);
       const detected = hands.length > 0;
-      this.frameListeners.forEach((callback) => callback({ values, handsDetected: detected }));
       if (detected !== this.handsDetected) {
         this.handsDetected = detected;
         this.publishStatus({
@@ -200,16 +189,19 @@ export class MediaPipeSignRecognizer implements SignRecognizer {
         });
       }
 
-      this.framesSinceInference += 1;
+      // La ventana se llena a ritmo fijo, no al de la cámara (ver FRAME_INTERVAL_MS).
+      if (monotonicTimestamp - this.lastSampleAt < FRAME_INTERVAL_MS) return;
+      this.lastSampleAt = monotonicTimestamp;
+      this.sequence.add(hands);
+
       if (
         !this.classifier ||
         !this.sequence.isReady ||
-        this.inferencePending ||
-        this.framesSinceInference < INFERENCE_STRIDE
+        !this.sequence.hasHands() ||
+        this.inferencePending
       ) {
         return;
       }
-      this.framesSinceInference = 0;
       this.inferencePending = true;
       const generation = this.generation;
       void this.classifier

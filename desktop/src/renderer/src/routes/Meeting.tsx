@@ -7,11 +7,7 @@ import { usePhrases } from '@/api/usePhrases';
 import { useMeetingMode } from '@/hooks/useMeetingMode';
 import { useOutputDevices } from '@/hooks/useOutputDevices';
 import { usePhraseShortcuts } from '@/hooks/usePhraseShortcuts';
-import {
-  modelStatusText,
-  useSignRecognition,
-  visionMessageKey,
-} from '@/hooks/useSignRecognition';
+import { modelStatusText, useSignRecognition, visionMessageKey } from '@/hooks/useSignRecognition';
 import { useVoicePreload } from '@/hooks/useVoicePreload';
 import { t } from '@/i18n';
 import { resolveMeetingOutput } from '@/services/audio/outputDevice';
@@ -42,9 +38,7 @@ export default function Meeting() {
   const synthError = usePlayback((s) => s.synthError);
   const meetingOutput = useSettings((s) => s.meetingOutput);
   const { devices, loaded } = useOutputDevices();
-  const model = useSignModel(
-    useShallow((s) => ({ status: s.status, metrics: s.metrics, job: s.job })),
-  );
+  const model = useSignModel(useShallow((s) => ({ status: s.status, labels: s.labels })));
   useVoicePreload();
 
   const phrasesRef = useRef(phrases);
