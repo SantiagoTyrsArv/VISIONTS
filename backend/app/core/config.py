@@ -18,8 +18,16 @@ class Settings(BaseSettings):
     rate_limit_login: str = "5/minute"
     rate_limit_register: str = "10/minute"
     rate_limit_refresh: str = "30/minute"
-    rate_limit_samples: str = "60/minute"
-    rate_limit_train: str = "10/hour"
+
+    @field_validator("database_url")
+    @classmethod
+    def _psycopg_driver(cls, v: str) -> str:
+        # Neon y Render dan URLs `postgres://` o `postgresql://`, que SQLAlchemy asocia a psycopg2
+        # (no instalado). Se fuerza el driver psycopg 3; la query (sslmode=require...) se conserva.
+        for prefix in ("postgres://", "postgresql://"):
+            if v.startswith(prefix):
+                return "postgresql+psycopg://" + v.removeprefix(prefix)
+        return v
 
     @field_validator("cors_origins", mode="before")
     @classmethod
