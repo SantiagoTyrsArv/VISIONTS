@@ -167,7 +167,7 @@ def test_login_limited_per_account_even_if_the_ip_changes(client, registered):
     limiter.reset()
     try:
         codes = []
-        for i in range(12):
+        for i in range(22):
             with TestClient(app, client=(f"203.0.113.{i}", 50000)) as other_ip:
                 codes.append(
                     other_ip.post(
@@ -177,5 +177,28 @@ def test_login_limited_per_account_even_if_the_ip_changes(client, registered):
     finally:
         limiter.enabled = False
         limiter.reset()
-    assert codes[:10] == [401] * 10
-    assert codes[10:] == [429, 429]
+    assert codes[:20] == [401] * 20
+    assert codes[20:] == [429, 429]
+
+
+def test_only_failed_logins_count_and_a_success_resets_them(client, registered):
+    # Si contaran los aciertos (o no se reiniciaran), un tercero con el correo de la víctima
+    # la dejaría fuera con menos intentos, y la propia usuaria se bloquearía al entrar a menudo.
+    limiter.enabled = True
+    limiter.reset()
+    bad = {"email": USER["email"], "password": "mala12345"}
+    good = {"email": USER["email"], "password": USER["password"]}
+    try:
+        codes = []
+        for i in range(19):
+            with TestClient(app, client=(f"198.51.100.{i}", 50000)) as c:
+                codes.append(c.post("/auth/login", json=bad).status_code)
+        with TestClient(app, client=("198.51.100.200", 50000)) as c:
+            assert c.post("/auth/login", json=good).status_code == 200
+        for i in range(19):
+            with TestClient(app, client=(f"192.0.2.{i}", 50000)) as c:
+                codes.append(c.post("/auth/login", json=bad).status_code)
+    finally:
+        limiter.enabled = False
+        limiter.reset()
+    assert codes == [401] * 38
