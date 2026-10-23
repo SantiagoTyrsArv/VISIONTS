@@ -1,6 +1,6 @@
 """Genera el fixture que comprueba que la GRU en TypeScript calcula igual que PyTorch.
 
-Uso (desde backend/): python -m scripts.export_gru_fixture
+Uso (desde training/): python -m scripts.export_gru_fixture
 """
 
 import json
@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from app.training.model import SignGRU, export_weights
+from senavoz_training.model import SignGRU, export_weights
 
 OUT = (
     Path(__file__).resolve().parents[2]

@@ -129,7 +129,28 @@ Señas útiles con **≥ 15 personas**: `Hola`, `Chao`, `Buenos dias`, `Buenas t
 
 ## Precisión (validación por persona)
 
-Pendiente: se completa tras la Tarea 6 (`build --dry-run`)
+Resultado (2026-10-20, `build --dry-run`, semilla 0): **solo 3 señas pasan el 80 %**: `bad` 1,0, `good_afternoon` 0,89 y `good_morning` 1,0 (`neutral` 0,99). **No se cumple el criterio de 4 señas.**
+
+Primera ronda de entrenamiento (antes de pasar las débiles a `neutral`), división por defecto (7 personas de validación de 35):
+
+| seña | acierto | seña | acierto |
+| --- | --- | --- | --- |
+| bad | 1,0 | help | 1,0 |
+| bye | 0,44 | please | 0,78 |
+| good | 0,56 | sorry | 1,0 |
+| good_afternoon | 0,89 | welcome | 1,0 |
+| good_evening | 0,89 | neutral | 0,97 |
+| good_morning | 1,0 | hello | 0,67 |
+
+`yes`, `no` y `thanks` no tienen a nadie en validación: no se miden (y `build_model` las dejaría pasar sin medir: **bug** por corregir).
+
+Problemas observados:
+
+- **Validación muy ruidosa.** De las 7 personas de validación solo unas 3 hicieron Cordialidad: unas 9 muestras por seña, así que un fallo baja a 0,89. Con la validación elegida entre las 18 personas de Cordialidad (4 personas, ~12 muestras por seña), tres divisiones distintas dan resultados muy diferentes. Por ejemplo, `welcome` sale con 0,36, 0,50 y 0,92, y `bad` con 0,82, 0,58 y 0,33. Solo los saludos (`good_morning`, `good_afternoon`, `good_evening`) quedan en ≥ 0,75 en las tres.
+- **Las rondas en cascada empeoran el resultado.** Al pasar a `neutral` las señas débiles, la clase `neutral` aprende movimientos parecidos a las señas buenas, y en la siguiente ronda caen más señas.
+- **Desequilibrio de clases:** 2231 muestras `neutral` frente a ~54 por seña. Ponderar la pérdida por clase (inversa o raíz de la frecuencia) **empeora**: `neutral` baja a 0,30–0,80, con muchos falsos positivos.
+
+Conclusión: con 18 personas y ~3 vídeos por persona y seña, la GRU no generaliza de forma fiable a personas nuevas.
 
 ## Decisión
 
@@ -146,3 +167,7 @@ No se usa `datos.json`. Los landmarks se extraen de `RawVideos/*.zip` con MediaP
 La correspondencia `SLOT0_KEY`/`SLOT1_KEY` de "Manos" deja de usarse: las manos se colocan por la `handedness` del Hand Landmarker con la misma regla que la app.
 
 Mejora opcional, fuera de este plan: preentrenar la GRU con un dataset grande de landmarks de MediaPipe (p. ej. *Google Isolated Sign Language Recognition*, ASL, ~94 000 ejemplos; revisar licencia) y ajustarla con LSC-54. Solo si la precisión por persona se queda corta.
+
+## Extracción (Tarea 5, 2026-10-20)
+
+`python -m senavoz_training.extract` sobre los tres zips de `RawVideos/` (MD5 comprobados): **2880 vídeos** procesados (Cordialidad 1198, Colores 1110, Numeros 542 + `Números` 30: el zip trae las dos grafías), 75 358 frames guardados (uno de cada 2). **28,3 % de los frames sin ninguna mano** (sobre todo al principio y al final de cada vídeo, con las manos bajadas); 43 vídeos no tienen manos en ningún frame y `load_lsc54` los descarta. Las señas de `SIGN_TO_CODE` tienen 18 personas, salvo `Si`, `No` y `Gracias` (9).
