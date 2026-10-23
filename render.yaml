@@ -21,6 +21,7 @@ services:
         generateValue: true
       - key: CORS_ORIGINS
         value: app://senavoz
-      # Render es el único camino de entrada: se acepta su X-Forwarded-For (límite por IP real).
+      # Límite por IP según X-Forwarded-For: sin esto todos compartirían la IP del proxy. El cliente
+      # puede falsificar esa IP; la fuerza bruta la frena el límite por cuenta (RATE_LIMIT_LOGIN_ACCOUNT).
       - key: FORWARDED_ALLOW_IPS
         value: '*'

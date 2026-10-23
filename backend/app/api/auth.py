@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.rate_limit import limiter
+from app.core.rate_limit import account_attempt_allowed, limiter
 from app.db.session import get_db
 from app.schemas.auth import LoginIn, RefreshIn, RegisterIn, TokenPair, UserOut
 from app.services import auth_service
@@ -23,6 +23,11 @@ def register(request: Request, data: RegisterIn, db: Session = Depends(get_db)):
 @router.post("/login", response_model=TokenPair)
 @limiter.limit(_settings.rate_limit_login)
 def login(request: Request, data: LoginIn, db: Session = Depends(get_db)):
+    if not account_attempt_allowed("login", data.email, _settings.rate_limit_login_account):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Demasiados intentos con esta cuenta. Inténtalo más tarde.",
+        )
     try:
         return auth_service.login(db, data.email, data.password)
     except auth_service.AuthError as e:

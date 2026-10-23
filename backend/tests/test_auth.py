@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta, timezone
 
+from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.core.rate_limit import limiter
 from app.core.security import hash_refresh_token
 from app.db.models import RefreshToken, User
+from app.main import app
 
 from .conftest import USER
 
@@ -156,3 +158,24 @@ def test_logout_revokes_refresh_token(client, tokens):
 
 def test_logout_is_idempotent_for_unknown_token(client):
     assert client.post("/auth/logout", json={"refresh_token": "nope"}).status_code == 204
+
+
+def test_login_limited_per_account_even_if_the_ip_changes(client, registered):
+    # Detrás de un proxy, la IP sale de X-Forwarded-For y el cliente puede inventarla:
+    # el límite por cuenta frena la fuerza bruta aunque cada intento llegue de otra IP.
+    limiter.enabled = True
+    limiter.reset()
+    try:
+        codes = []
+        for i in range(12):
+            with TestClient(app, client=(f"203.0.113.{i}", 50000)) as other_ip:
+                codes.append(
+                    other_ip.post(
+                        "/auth/login", json={"email": "ANA@example.com", "password": "mala12345"}
+                    ).status_code
+                )
+    finally:
+        limiter.enabled = False
+        limiter.reset()
+    assert codes[:10] == [401] * 10
+    assert codes[10:] == [429, 429]
