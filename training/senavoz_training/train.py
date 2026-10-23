@@ -96,12 +96,19 @@ def train_model(
     seed: int = 0,
     time_budget_s: float = 300.0,
     clock: Callable[[], float] = time.monotonic,
+    test_signers: set[str] = frozenset(),
 ) -> TrainResult:
+    """Con `test_signers`, sus muestras no entrenan ni deciden la parada temprana (eso lo hacen
+    `val_signers`) y el acierto se mide solo con ellas: medir con las mismas personas que eligen
+    la época daría un acierto optimista."""
     labels = sorted({label for _, label, _ in samples})
     if len(labels) < 2:
         raise ValueError("Se necesitan al menos dos etiquetas para entrenar")
     rng = np.random.default_rng(seed)
     torch.manual_seed(seed)
+    held_out = [x for x in samples if x[0] in test_signers]
+    samples = [x for x in samples if x[0] not in test_signers]
+    extra = [x for x in extra if x[0] not in test_signers]
     signers = sorted({s for s, _, _ in samples})
     if val_signers is None:
         n_val = max(1, round(len(signers) * VAL_SIGNER_FRACTION))
@@ -145,20 +152,29 @@ def train_model(
 
     model.load_state_dict(best_state)
     model.eval()
+    if test_signers:
+        _, _, x_ev, y_ev = _split(held_out, (), labels, set(test_signers))
+    else:
+        x_ev, y_ev = x_va, y_va
+    measured = len(x_ev) > 0
     with torch.no_grad():
-        pred = model(xv).argmax(dim=1).numpy() if validate else y_va
+        pred = model(torch.from_numpy(x_ev)).argmax(dim=1).numpy() if measured else y_ev
     # Una seña sin personas en validación no tiene acierto medible: no se incluye.
     per_label = {
-        label: round(float((pred[y_va == k] == k).mean()), 4)
+        label: round(float((pred[y_ev == k] == k).mean()), 4)
         for k, label in enumerate(labels)
-        if (y_va == k).any()
+        if (y_ev == k).any()
     }
     metrics = {
-        "val_accuracy": round(float((pred == y_va).mean()), 4) if validate else None,
+        "val_accuracy": round(float((pred == y_ev).mean()), 4) if measured else None,
         "per_label": per_label,
-        "samples": {label: sum(1 for _, l, _ in samples if l == label) for label in labels},
+        "samples": {
+            label: sum(1 for _, l, _ in [*samples, *held_out] if l == label) for label in labels
+        },
         "val_signers": sorted(val_signers),
+        "test_signers": sorted(test_signers),
         "train_size": len(x_tr),
+        "eval_size": len(x_ev),
         "best_epoch": best_epoch,
     }
     return TrainResult(weights=export_weights(model, labels), metrics=metrics)

@@ -65,3 +65,19 @@ def test_sign_done_by_a_single_signer_is_not_exported():
     model = build_model(_samples() + extra, **FAST)
     assert model is not None
     assert "thanks" not in model["labels"]
+
+
+def test_early_stopping_never_uses_the_measured_signers(monkeypatch):
+    import senavoz_training.build as build
+
+    calls = []
+    real = build.train_model
+
+    def spy(samples, **kw):
+        calls.append((kw["val_signers"], kw["test_signers"]))
+        return real(samples, **kw)
+
+    monkeypatch.setattr(build, "train_model", spy)
+    cross_validate(_samples(), **FAST)
+    assert all(val and test and not val & test for val, test in calls)
+    assert set().union(*(test for _, test in calls)) == {f"S{i}" for i in range(10)}

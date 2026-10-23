@@ -115,3 +115,15 @@ def test_without_validation_trains_all_epochs():
 def test_best_epoch_is_reported():
     result = train_model(_synthetic(), hidden_size=8, max_epochs=4, weight_decay=1e-3)
     assert 1 <= result.metrics["best_epoch"] <= 4
+
+
+def test_test_signers_are_left_out_of_training_and_early_stopping():
+    # La parada temprana elige época con val_signers; el acierto se mide con test_signers,
+    # que el modelo no vio ni influyeron en esa elección.
+    extra = [("S2", "yes", np.full((30, 126), 0.4, np.float32))]
+    result = train_model(_synthetic(), extra=extra, hidden_size=8, max_epochs=2,
+                         val_signers={"S0", "S1"}, test_signers={"S2"})
+    assert result.metrics["test_signers"] == ["S2"]
+    assert result.metrics["train_size"] == 7 * 4 * 3  # sin S0, S1 ni S2 (tampoco su extra)
+    assert result.metrics["eval_size"] == 4 * 3  # solo S2
+    assert set(result.metrics["per_label"]) == {"neutral", "no", "yes"}

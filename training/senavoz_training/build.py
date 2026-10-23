@@ -64,20 +64,24 @@ class CrossValidation:
 
 
 def _fold(job):
-    samples, extra, val, seed, kw = job
+    samples, extra, test, stop, seed, kw = job
     torch.set_num_threads(2)
-    return train_model(samples, extra=extra, val_signers=val, seed=seed, **kw).metrics
+    return train_model(samples, extra=extra, val_signers=stop, test_signers=test, seed=seed,
+                       **kw).metrics
 
 
 def cross_validate(samples: list[Sample], *, extra: Sequence[Sample] = (), folds: int = FOLDS,
                    seeds: Sequence[int] = SEEDS, workers: int = 1, **kw) -> CrossValidation:
     """Validación cruzada por persona: las personas que hacen alguna seña se reparten en `folds`
     grupos y cada grupo se valida con un modelo que no lo vio. Una división única deja ~9 muestras
-    por seña y da resultados muy distintos según quién cae en validación (FINDINGS.md)."""
+    por seña y da resultados muy distintos según quién cae en validación (FINDINGS.md).
+    La parada temprana de cada modelo usa el grupo siguiente, nunca el que se mide: elegir la
+    época con las personas medidas inflaría el acierto justo en el umbral del 80 %."""
     signers = sorted({s for s, l, _ in samples if l != NEUTRAL})
     order = np.random.default_rng(0).permutation(signers).tolist()
     groups = [set(order[i::folds]) for i in range(folds)]
-    jobs = [(samples, extra, g, seed, kw) for seed in seeds for g in groups]
+    jobs = [(samples, extra, g, groups[(i + 1) % folds], seed, kw)
+            for seed in seeds for i, g in enumerate(groups)]
     if workers > 1:
         with ProcessPoolExecutor(workers) as ex:
             results = list(ex.map(_fold, jobs))
@@ -87,7 +91,7 @@ def cross_validate(samples: list[Sample], *, extra: Sequence[Sample] = (), folds
     validated = set(signers)
     counts = {l: sum(1 for s, ll, _ in samples if ll == l and s in validated) for l in labels}
     hits = dict.fromkeys(labels, 0.0)
-    for (_, _, group, _, _), m in zip(jobs, results):
+    for (_, _, group, _, _, _), m in zip(jobs, results):
         for l in labels:
             n = sum(1 for s, ll, _ in samples if ll == l and s in group)
             hits[l] += m["per_label"].get(l, 0.0) * n  # sin muestras de entreno: 0 aciertos
