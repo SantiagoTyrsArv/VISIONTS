@@ -7,7 +7,9 @@ flowchart LR
   subgraph Desktop["App de escritorio (Electron, Windows)"]
     subgraph Renderer["Renderer (React)"]
       Cam["getUserMedia\n(webcam)"]
-      Rec["MediaPipe Hand Landmarker\n(landmarks locales · GRU del usuario en memoria)"]
+      Rec["MediaPipe Hand Landmarker\n(landmarks locales · GRU LSC global)"]
+      Model[("sign-model.json\n(empaquetado)")]
+      Model --> Rec
       Speech["SpeechService\n(voces de Windows + setSinkId)"]
       UI["React Router\nZustand + TanStack Query"]
       Cam --> Rec --> Speech
@@ -19,19 +21,15 @@ flowchart LR
   end
 
   subgraph Server["Backend (Docker)"]
-    API["FastAPI\n/auth /users /phrases\n/samples /models"]
+    API["FastAPI\n/auth /users /phrases"]
     DB[("PostgreSQL")]
-    Trainer["trainer (PyTorch)"]
     API --> DB
-    Trainer --> DB
   end
 
   VCable["Cable de audio virtual"]
   Meet["Reunión (Zoom/Meet/Teams)"]
 
   UI -- "HTTPS + JWT" --> API
-  Rec -- "muestras (landmarks)" --> API
-  API -- "pesos GRU (memoria)" --> Rec
   Speech -- "setSinkId" --> VCable --> Meet
 ```
 
@@ -65,31 +63,7 @@ Los errores de login son genéricos ("Correo o contraseña incorrectos"). Cuando
 
 ## Modelo de datos
 
-Migración `0001`: `users`, `refresh_tokens`, `phrases`. Migración `0002`: `sign_samples`, `sign_models`. Ambas tablas nuevas se borran en cascada con el usuario.
-
-**`sign_samples`** — ráfagas grabadas por el usuario para entrenar.
-
-| Columna    | Tipo            | Nota                                                                           |
-| ---------- | --------------- | ------------------------------------------------------------------------------ |
-| id         | UUID PK         |                                                                                |
-| user_id    | UUID FK → users | índice compuesto `(user_id, label)`                                            |
-| label      | varchar(50)     | `code` de una frase del catálogo o `neutral` (reposo)                          |
-| data       | bytea           | 30 × 126 `float32` little-endian (15.120 bytes), valores ≤ 2 en valor absoluto |
-| created_at | timestamptz     |                                                                                |
-
-**`sign_models`** — entrenamientos por usuario; solo se conserva el último modelo listo.
-
-| Columna     | Tipo            | Nota                                                  |
-| ----------- | --------------- | ----------------------------------------------------- |
-| id          | UUID PK         |                                                       |
-| user_id     | UUID FK → users |                                                       |
-| status      | varchar(20)     | `queued` → `training` → `ready` o `failed`            |
-| labels      | JSON            | etiquetas con el mínimo de muestras, ordenadas        |
-| weights     | JSON            | formato `senavoz-gru-v1` (puertas r, z, n de PyTorch) |
-| metrics     | JSON            | `val_accuracy`, `per_label`, `samples`                |
-| error       | text            | motivo del fallo, visible para el usuario             |
-| created_at  | timestamptz     |                                                       |
-| finished_at | timestamptz     |                                                       |
+Migración `0001`: `users`, `refresh_tokens`, `phrases`. Las migraciones `0002` y `0003` crearon `sign_samples` y `sign_models` (modelo por usuario); la migración `0004` las elimina: el modelo de señas es global y va dentro de la app.
 
 ## Decisiones
 
@@ -99,21 +73,25 @@ Migración `0001`: `users`, `refresh_tokens`, `phrases`. Migración `0002`: `sig
 
 **Proceso main mínimo y aislado.** Main solo gestiona ventana, protocolo, permisos (solo cámara) y tokens. Toda la lógica de producto está en el renderer, con `contextIsolation` + `sandbox`. El preload expone una API de tres funciones.
 
-**Visión local.** MediaPipe Hand Landmarker detecta hasta dos manos en el renderer y produce landmarks; nunca se envía vídeo. El archivo del detector y el WASM con SIMD se empaquetan localmente. Se clasifica uno de cada 3 frames para no cargar la CPU durante las reuniones.
+**Visión local.** MediaPipe Hand Landmarker detecta hasta dos manos en el renderer y produce landmarks; nunca se envía vídeo. El archivo del detector y el WASM con SIMD se empaquetan localmente. La ventana son 30 frames tomados cada `FRAME_INTERVAL_MS`; sin manos en la ventana no se ejecuta el modelo.
 
 El artefacto de detección de manos incluido es el modelo oficial [Hand Landmarker](https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task); MediaPipe lo utiliza para extraer keypoints y no para clasificar señas del catálogo.
 
-**Datos y modelo de señas.** Las muestras (solo landmarks, 30 × 126 por ráfaga) viven en el servidor asociadas a la cuenta, y el usuario puede borrarlas cuando quiera. El servicio `trainer` toma los entrenamientos en cola y entrena una GRU pequeña (126 → 64) con PyTorch CPU; la API no importa `torch`. La app ejecuta la GRU en TypeScript puro, verificada contra PyTorch con un fixture y sin runtimes de ML. Los pesos se piden con `no-store`, solo viven en memoria y se descartan al cerrar sesión. La clase `neutral` (reposo) nunca produce frase. Spec: `docs/superpowers/specs/2026-10-07-trained-sign-model-design.md`.
+**Datos y modelo de señas.** Un único modelo de Lengua de Señas Colombiana, entrenado offline en `training/` con LSC-54 (Mora-Zarate, Garzón-Castro y Castellanos-Rivillas, 2025; CC BY-NC 4.0) y empaquetado en la app como `sign-model.json`. Los landmarks del dataset se extraen de sus vídeos con el mismo Hand Landmarker que la app, y la normalización de `training/` y la de la app se verifican con un fixture de paridad. La validación es por persona (personas no vistas en el entrenamiento) y solo se exportan las señas con ≥ 80 % de acierto. La clase `neutral` (manos bajadas o quietas, en parte sintética) nunca produce frase. El catálogo es mixto: las frases con seña se reconocen; el resto se dice con clic o atajo. La app ejecuta la GRU en TypeScript puro, verificada contra PyTorch con un fixture y sin runtimes de ML. Spec: `docs/superpowers/specs/2026-10-14-global-sign-model-design.md`.
 
 **TTS pregenerado/cacheado.** Las frases son un conjunto cerrado y pequeño. Se pueden pregenerar con una voz de más calidad que la del sistema y reproducirlas localmente. `SpeechService` lo abstrae: `GeneratedSpeechService` reproduce el audio generado con las voces de Windows (precargado para todo el catálogo) y, solo fuera del Modo reunión, cae a `WebSpeechService` si la síntesis falla.
 
 **Audio hacia la reunión (Modo reunión).** El main genera WAV con las voces OneCore de Windows (`resources/tts/synth.ps1`, WinRT vía PowerShell) y los guarda en `userData/tts-cache/` por voz + velocidad + texto. El renderer los reproduce con `HTMLAudioElement.setSinkId()` hacia VB-Cable ("CABLE Input"), que la reunión usa como micrófono ("CABLE Output"). En Modo reunión la voz nunca sale por los altavoces. La ventana se vuelve compacta y siempre visible, y Ctrl+Alt+1…9 funcionan con la reunión enfocada. Spec: `docs/superpowers/specs/2026-10-07-meeting-mode-design.md`.
 
-**Interfaces desacopladas.** `SignRecognizer` y `SpeechService` son el contrato entre la UI y las capacidades cambiantes. `MediaPipeSignRecognizer` implementa la detección de manos, admite cambiar de clasificador sin reiniciar la cámara y emite los frames normalizados (los usa la pantalla Entrenar); la pantalla de cámara no depende directamente de MediaPipe.
+**Interfaces desacopladas.** `SignRecognizer` y `SpeechService` son el contrato entre la UI y las capacidades cambiantes. `MediaPipeSignRecognizer` implementa la detección de manos, admite cambiar de clasificador sin reiniciar la cámara; la pantalla de cámara no depende directamente de MediaPipe.
 
 ## Roadmap
 
-### Modelo de señas por usuario — hecho
+### Modelo de señas global — hecho
+
+Ver la spec `docs/superpowers/specs/2026-10-14-global-sign-model-design.md` y el plan `docs/superpowers/plans/2026-10-14-global-sign-model.md`.
+
+### Modelo de señas por usuario — sustituido por el modelo global
 
 Ver la spec `docs/superpowers/specs/2026-10-07-trained-sign-model-design.md` y el plan `docs/superpowers/plans/2026-10-07-trained-sign-model.md`.
 

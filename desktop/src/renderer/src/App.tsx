@@ -12,7 +12,6 @@ import Meeting from '@/routes/Meeting';
 import Phrases from '@/routes/Phrases';
 import Register from '@/routes/Register';
 import Settings from '@/routes/Settings';
-import Train from '@/routes/Train';
 import { useSession } from '@/store/session';
 
 export function App() {
@@ -33,7 +32,6 @@ export function App() {
             <Route element={<AppLayout />}>
               <Route path="/frases" element={<Phrases />} />
               <Route path="/camara" element={<Camera />} />
-              <Route path="/entrenar" element={<Train />} />
               <Route path="/ajustes" element={<Settings />} />
             </Route>
             <Route path="/reunion" element={<Meeting />} />

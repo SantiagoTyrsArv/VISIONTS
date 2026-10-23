@@ -1,11 +1,12 @@
 # SeñaVoz
 
-App de escritorio (Windows) para traducir señas a voz. Incluye autenticación, catálogo de frases, reproducción de voz y detección local de manos con MediaPipe. Cada usuario entrena su propio modelo de señas desde la pantalla Entrenar; la voz llega a cualquier app de reuniones (Zoom, Teams, Meet…) a través del **Modo reunión** (ver [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
+App de escritorio (Windows) para traducir señas a voz. Incluye autenticación, catálogo de frases, reproducción de voz y detección local de manos con MediaPipe. Reconoce señas de la Lengua de Señas Colombiana con un modelo incluido en la app (sin entrenar nada); la voz llega a cualquier app de reuniones (Zoom, Teams, Meet…) a través del **Modo reunión** (ver [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
 
 ```
 senavoz/
 ├── desktop/    # Electron + React + TypeScript (electron-vite)
 ├── backend/    # FastAPI + SQLAlchemy 2 + Alembic + PostgreSQL
+├── training/   # entrenamiento offline del modelo de señas (no se despliega)
 ├── docker-compose.yml
 └── docs/       # ARCHITECTURE.md, specs y planes
 ```
@@ -26,7 +27,7 @@ senavoz/
 docker compose up --build
 ```
 
-Levanta `db` (Postgres 17), `api` y `trainer` (entrena los modelos de señas en cola con PyTorch CPU). Ambos salen del mismo `Dockerfile` con objetivos distintos: la imagen de la API no incluye PyTorch. Al arrancar, el contenedor ejecuta `alembic upgrade head` y el seed idempotente de frases. La API queda en <http://localhost:8000>, con documentación interactiva en `/docs`.
+Levanta `db` (Postgres 17) y `api`. Al arrancar, el contenedor ejecuta `alembic upgrade head` y el seed idempotente de frases. La API queda en <http://localhost:8000>, con documentación interactiva en `/docs`.
 
 > Las credenciales de BD y el `JWT_SECRET` por defecto de `docker-compose.yml` son **solo para desarrollo**. Para cualquier otro entorno defínelos (`POSTGRES_PASSWORD`, `JWT_SECRET`) en un `.env` junto al compose. El secreto JWT debe tener ≥ 32 caracteres.
 
@@ -53,14 +54,8 @@ uvicorn app.main:app --reload
 | GET    | `/users/me`             | Bearer | Perfil                                                                                         |
 | GET    | `/phrases`              | Bearer | Catálogo de frases                                                                             |
 | GET    | `/health`               | –      | Liveness                                                                                       |
-| POST   | `/samples`              | Bearer | 201; una ráfaga de 30 × 126 valores para una frase o `neutral`. Máx. 100 por etiqueta          |
-| GET    | `/samples/summary`      | Bearer | Nº de muestras por etiqueta                                                                    |
-| DELETE | `/samples`              | Bearer | 204; con `?label=` borra esa etiqueta; sin él, todas las muestras y modelos                    |
-| POST   | `/models/train`         | Bearer | 202; encola un entrenamiento (409 si ya hay uno; 422 si faltan muestras)                       |
-| GET    | `/models/status`        | Bearer | Último modelo listo y entrenamiento más reciente                                               |
-| GET    | `/models/ready/weights` | Bearer | Pesos `senavoz-gru-v1` con `Cache-Control: no-store`                                           |
 
-Access token: 15 min. Refresh token: 7 días, `secrets.token_urlsafe`, guardado como SHA-256. Rate limiting por IP en login (5/min), register (10/min) y refresh (30/min), y por usuario en `POST /samples` (60/min) y `POST /models/train` (10/hora).
+Access token: 15 min. Refresh token: 7 días, `secrets.token_urlsafe`, guardado como SHA-256. Rate limiting por IP en login (5/min), register (10/min) y refresh (30/min).
 
 ### Variables de entorno (`backend/.env.example`)
 
@@ -74,6 +69,8 @@ Access token: 15 min. Refresh token: 7 días, `secrets.token_urlsafe`, guardado 
 
 Nota: el límite de peticiones usa la memoria del proceso. Con varios workers o réplicas habría que moverlo a Redis.
 
+Para desplegar (Neon + Render), la API acepta la `DATABASE_URL` tal como la da Neon (`postgresql://…?sslmode=require`) y escucha en `$PORT`. Detrás del proxy de Render hay que definir `FORWARDED_ALLOW_IPS=*`: si no, el límite por IP vería a todos los usuarios como uno solo.
+
 ## App de escritorio
 
 ```bash
@@ -84,15 +81,16 @@ npm run dev                 # app en modo desarrollo con recarga en caliente
 npm run build:win           # instalador en desktop/release/SenaVoz-Setup-<versión>.exe
 ```
 
+**`build:win` exige el modelo de señas** (`desktop/src/renderer/src/assets/sign-model.json`, lo genera `training/`). Sin él, `npm run dev` y los tests funcionan, pero la app muestra "Reconocimiento de señas no disponible" y solo dice frases con clic o atajo.
+
 **`RENDERER_VITE_API_URL` se fija al compilar**, porque también se escribe en la CSP de `index.html`. Si la cambias, hay que recompilar. Debe ser alcanzable desde el PC (normalmente `http://localhost:8000`).
 
 ### Uso
 
 1. Regístrate (entras directamente) o inicia sesión. La sesión se mantiene al cerrar y reabrir la app.
 2. **Frases**: haz clic en una tarjeta (o pulsa Enter/Espacio) y se reproduce en voz. **Atajos 1–9** para las nueve primeras frases; no se disparan mientras escribes ni con Ctrl/Alt.
-3. **Cámara**: vista de la webcam en espejo; MediaPipe detecta hasta dos manos y muestra su estado. La app empaqueta el runtime WASM y el modelo de detección, por lo que no necesita descargar esos archivos al iniciarse. Con un modelo entrenado, cada seña reconocida dice su frase; el panel muestra el estado del modelo y su precisión. Si hay varias webcams aparece un selector; los errores de permiso y cámara mantienen su mensaje específico y opción "Reintentar".
-4. **Entrenar**: graba 20 muestras de **Reposo** y de al menos 2 frases (sesiones de 5 ráfagas con cuenta atrás), pulsa **Entrenar modelo** y espera a "Listo". Solo se envían los landmarks de las manos, nunca vídeo, y no se guarda nada en el equipo.
-5. **Ajustes**: sección **Reunión** (detección de VB-Cable, salida y prueba por el cable), voz de Windows (voces `es-*` instaladas), volumen, velocidad, cámara preferida (si se desenchufa, se usa la predeterminada), **Borrar todos mis datos de entrenamiento** y **Cerrar sesión**, que revoca el refresh token en el servidor.
+3. **Cámara**: vista de la webcam en espejo; MediaPipe detecta hasta dos manos y muestra su estado. La app empaqueta el runtime WASM y el modelo de detección, por lo que no necesita descargar esos archivos al iniciarse. Las frases marcadas con **Seña** se reconocen al hacerlas frente a la cámara y se dicen en voz; el panel muestra el estado del modelo y cuántas señas reconoce. Si hay varias webcams aparece un selector; los errores de permiso y cámara mantienen su mensaje específico y opción "Reintentar".
+4. **Ajustes**: sección **Reunión** (detección de VB-Cable, salida y prueba por el cable), voz de Windows (voces `es-*` instaladas), volumen, velocidad, cámara preferida (si se desenchufa, se usa la predeterminada), **Créditos** (atribución de LSC-54) y **Cerrar sesión**, que revoca el refresh token en el servidor.
 
 ### Usar SeñaVoz en una reunión
 
@@ -105,7 +103,7 @@ npm run build:win           # instalador en desktop/release/SenaVoz-Setup-<versi
 - Los tokens solo se guardan **cifrados con `safeStorage` (DPAPI de Windows)** en `%APPDATA%\SeñaVoz\session.bin`, desde el proceso main. Si el cifrado no está disponible, la sesión no se guarda (nunca en claro). Las preferencias no sensibles van a `localStorage`.
 - `contextIsolation` + `sandbox` activados y `nodeIntegration` desactivado. El preload expone `window.senavoz.tokens`, `tts` (voces, síntesis y poda de caché) y `meeting` (entrar, salir y atajos). Los textos a sintetizar llegan a PowerShell por stdin, nunca como argumentos.
 - La UI se sirve desde el protocolo propio `app://senavoz`, que solo entrega archivos de la carpeta de la UI. La CSP limita `connect-src` a la API.
-- Las muestras de señas (solo landmarks, nunca vídeo) y el modelo viven en el servidor; la app mantiene los pesos solo en memoria y los pide con `no-store`.
+- La app no envía vídeo ni landmarks a ningún servidor: el modelo va dentro de la app.
 - Solo se conceden a la propia app los permisos de cámara y de elección de salida de audio (`setSinkId`). La navegación externa y `window.open` están bloqueados.
 
 ## Tests

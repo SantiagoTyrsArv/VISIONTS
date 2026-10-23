@@ -1,5 +1,7 @@
 # SeñaVoz — Modelo de señas entrenado por usuario
 
+> **Sustituida** el 2026-10-14 por `2026-10-14-global-sign-model-design.md`: ya no hay entrenamiento por usuario.
+
 Fecha: 2026-10-07 · Estado: aprobado en conversación, pendiente de revisión escrita
 
 ## Contexto y objetivo

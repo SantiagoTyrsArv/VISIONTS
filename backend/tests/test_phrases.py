@@ -24,3 +24,9 @@ def test_seed_is_idempotent(db_session):
     assert seed_default_phrases(db_session) == len(DEFAULT_PHRASES)
     assert seed_default_phrases(db_session) == 0
     assert db_session.scalar(select(func.count()).select_from(Phrase)) == len(DEFAULT_PHRASES)
+
+
+def test_removed_endpoints_are_gone(client, tokens):
+    auth = {"Authorization": f"Bearer {tokens['access_token']}"}
+    assert client.get("/samples/summary", headers=auth).status_code == 404
+    assert client.get("/models/status", headers=auth).status_code == 404

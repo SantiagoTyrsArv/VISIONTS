@@ -1,0 +1,7 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.1+cpu
+numpy==2.5.3
+pytest==9.1.1
+# Extracción de landmarks de los vídeos (mismo detector que la app)
+mediapipe==1.1.1
+opencv-python-headless==5.0.0.93

@@ -44,14 +44,15 @@
 - `training/senavoz_training/model.py`: movido desde `backend/app/training/model.py`.
 - `training/senavoz_training/train.py`: movido; añade validación por persona y aumentos.
 - `training/senavoz_training/preprocess.py`: normalización idéntica a `landmarks.ts`.
-- `training/senavoz_training/lsc54.py`: lectura de los JSON de LSC-54.
+- `training/senavoz_training/extract.py`: extrae los landmarks de los vídeos crudos de LSC-54 con MediaPipe Hand Landmarker (mismo detector que la app) a una caché `.npy`.
+- `training/senavoz_training/lsc54.py`: lectura de la caché de `extract.py` a ventanas 30×126.
 - `training/senavoz_training/neutral.py`: secuencias de la clase `neutral`.
 - `training/senavoz_training/labels.py`: mapa seña del dataset → `code` de frase.
 - `training/senavoz_training/build.py`: CLI que genera `sign-model.json`.
 - `training/scripts/explore.py`: exploración de la Tarea 1 (desechable, no se versiona).
 - `training/scripts/make_landmarks_fixture.py`: genera el fixture de paridad.
 - `training/scripts/export_gru_fixture.py`: movido desde `backend/scripts/`.
-- `training/tests/test_preprocess.py`, `test_train.py`, `test_lsc54.py`, `test_neutral.py`, `test_build.py`
+- `training/tests/test_preprocess.py`, `test_train.py`, `test_extract.py`, `test_lsc54.py`, `test_neutral.py`, `test_build.py`
 - `desktop/src/renderer/src/services/recognition/__fixtures__/landmarks-parity.json`
 - `desktop/src/renderer/src/assets/sign-model.json`: generado por la Tarea 6.
 - `backend/alembic/versions/0004_drop_sign_tables.py`
@@ -152,7 +153,7 @@ Hacer lo mismo en la app: `npm run dev` en `desktop/`, abrir Cámara, levantar s
 
 - [ ] **Step 4: Prueba rápida de precisión**
 
-Se hace después de la Tarea 5, con `python -m senavoz_training.build --data training/data/lsc54 --dry-run`, que imprime la precisión por seña sin escribir el modelo. Volver aquí y anotarla.
+Se hace después de la Tarea 5, con `python -m senavoz_training.build --data training/data/lsc54/cache --dry-run`, que imprime la precisión por seña sin escribir el modelo. Volver aquí y anotarla.
 
 - [ ] **Step 5: Escribir `training/FINDINGS.md`**
 
@@ -854,137 +855,62 @@ Se entrega junto con la Tarea 7, que borra el resto de `backend/app/training/`. 
 
 ### Task 5: Datos LSC-54, clase `neutral`, validación por persona y aumentos
 
+> **Enmienda (2026-10-14, tras la Tarea 1).** `datos.json` pesa 51 GB y no coincide con los vídeos. Los landmarks se extraen **de los vídeos crudos** (`RawVideos/*.zip`, ~970 MB, 30 fps; URLs y fileId en `training/FINDINGS.md`) con **MediaPipe Hand Landmarker**: el mismo detector y el mismo modelo que la app (`desktop/src/renderer/public/models/hand_landmarker.task`). Así las etiquetas `Left`/`Right` y las manos ausentes son idénticas a las de la app. Steps 1–2 se sustituyen por los Steps 1E–2E. Los Steps 3–6 siguen igual: `load_lsc54` mantiene su firma `load_lsc54(root) -> list[Sample]`, pero lee la caché de la extracción.
+>
+> **Constantes:** `FRAME_INTERVAL_MS = 66` (un frame de cada 2 a 30 fps; ventana de 30 frames ≈ 2 s) y `HAND_HOLD_FRAMES = 3`, iguales en `landmarks.ts`.
+>
+> **Step 1E: extracción con caché.** `training/senavoz_training/extract.py`:
+>
+> - `extract_video(path, landmarker) -> np.ndarray` de forma (T, 126) float32: abre el `.avi` con OpenCV y toma un frame de cada 2 (índices 0, 2, 4…). Por cada frame llama a `landmarker.detect_for_video(mp.Image(SRGB), timestamp_ms)` con timestamps crecientes (`índice × 1000 / fps`). Coloca cada mano por su `handedness` con **la misma regla que `assignHandSlots`** (Left → 0, Right → 1, repetida o sin etiqueta → primera libre) y normaliza con `normalize_frame`.
+> - Aplica a la secuencia el mismo mantenimiento de mano perdida que `LandmarkSequenceBuffer` (`hold_missing(seq, HAND_HOLD_FRAMES)`), para que el entrenamiento vea lo mismo que la app.
+> - `extract_all(zips_dir, cache_dir)`: recorre los zips sin descomprimirlos del todo (extrae cada `.avi` a un temporal), obtiene `(tema, seña, persona)` de la ruta dentro del zip y guarda `cache_dir/<tema>/<seña>/<persona>__<n>.npy`. Si el `.npy` existe, no lo recalcula. Muestra el progreso.
+> - Opciones del landmarker: `running_mode=VIDEO`, `num_hands=2` y los umbrales por defecto, como en la app.
+> - CLI: `python -m senavoz_training.extract --zips data/lsc54/RawVideos --cache data/lsc54/cache`.
+> - Tests (`training/tests/test_extract.py`): `hold_missing`, y la asignación de posiciones con un landmarker falso (objeto con `detect_for_video` que devuelve resultados construidos a mano, sin vídeo real); la regla debe coincidir con el fixture de paridad.
+> - Dependencias: añadir a `training/requirements.txt` `mediapipe` y `opencv-python-headless` con versiones fijadas. Si `mediapipe` no publica paquetes para el Python disponible (3.14), la extracción corre en Docker: `training/Dockerfile` con `python:3.12-slim` y un `docker run -v` que monta `training/`. Documentarlo en `training/README.md`.
+>
+> **Step 2E: ventanas.** `load_lsc54(root)` lee la caché y convierte cada vídeo (T, 126) en **una** muestra (30, 126):
+>
+> - si T ≥ 30, la ventana centrada en el tramo con manos;
+> - si T < 30, se rellena con ceros (sin manos) repartidos antes y después, como verá la app cuando la persona baja las manos.
+>
+> El aumento de `train.py` añade un **desplazamiento aleatorio de la ventana** (ya existe `MAX_SHIFT`; subirlo a 6). Los tests de `test_lsc54.py` se reescriben sobre una caché sintética de `.npy`: longitud mayor que 30 → centrada, menor → relleno con ceros, nombre de persona y seña sacados de la ruta. La parte de neutral "otras señas del dataset" usa colores y números de la misma caché.
+>
+> **Cooldown:** como una seña puede seguir dentro de la ventana hasta 2 s, en la Tarea 8 `createSignClassifier` se crea con `cooldownMs = SEQUENCE_LENGTH * FRAME_INTERVAL_MS` (≈ 2 s) en lugar de 1200.
+
 **Files:**
 
-- Create: `training/senavoz_training/lsc54.py`, `training/senavoz_training/neutral.py`, `training/senavoz_training/labels.py`
+- Create: `training/senavoz_training/extract.py`, `training/senavoz_training/lsc54.py`, `training/senavoz_training/neutral.py`, `training/senavoz_training/labels.py`
 - Modify: `training/senavoz_training/train.py`
-- Create: `training/tests/test_lsc54.py`, `training/tests/test_neutral.py`
+- Create: `training/tests/test_extract.py`, `training/tests/test_lsc54.py`, `training/tests/test_neutral.py`
+- Modify: `training/requirements.txt` (`mediapipe`, `opencv-python-headless`)
 - Modify: `training/tests/test_train.py`
 
 **Interfaces:**
 
-- Consumes: `normalize_frame` (Tarea 4); la estructura y la convención de manos de `FINDINGS.md` (Tarea 1).
+- Consumes: `normalize_frame` (Tarea 4); `FRAME_INTERVAL_MS` y `HAND_HOLD_FRAMES` de `landmarks.ts` (Tarea 3); el modelo `hand_landmarker.task` de la app.
 - Produces:
   - `Sample = tuple[str, str, np.ndarray]` (persona, seña, (30, 126) float32).
-  - `load_lsc54(root: Path) -> list[Sample]`
+  - `extract_video(path, landmarker) -> np.ndarray` (T, 126), `hold_missing(seq, frames) -> np.ndarray`, `extract_all(zips_dir, cache_dir) -> None`.
+  - `load_lsc54(root: Path) -> list[Sample]`: `root` es la caché de `extract_all`.
   - `SIGN_TO_CODE: dict[str, str]` y `NEUTRAL = "neutral"`.
   - `make_neutral(rng, n_zeros, still_frames, n_still) -> np.ndarray` (N, 30, 126).
   - `train_model(samples, *, val_signers: set[str] | None = None, ...)`: `samples` pasa a ser `list[Sample]`, con el mismo `TrainResult`.
   - `augment(batch, rng)` con espejo y *time-warp* añadidos.
 
-- [ ] **Step 1: Tests que fallan (lectura del dataset)**
+- [ ] **Step 1: Extracción con caché (Step 1E de la enmienda)**
 
-`training/tests/test_lsc54.py` construye un mini-dataset con la **estructura real anotada en FINDINGS.md**. Con la estructura del artículo:
+Descargar los tres zips de `RawVideos/` (fileId en `training/FINDINGS.md`) a `training/data/lsc54/RawVideos/`. Escribir primero `training/tests/test_extract.py` (debe fallar con `ModuleNotFoundError`), después `extract.py`, y ejecutar la extracción completa.
 
-```python
-import json
+Run: `cd training; .venv\Scripts\python -m pytest tests/test_extract.py`
+Expected: PASS
 
-import numpy as np
+Run: `cd training; .venv\Scripts\python -m senavoz_training.extract --zips data/lsc54/RawVideos --cache data/lsc54/cache`
+Expected: un `.npy` por vídeo en `data/lsc54/cache/<tema>/<seña>/`. Anotar en `FINDINGS.md` el nº de vídeos procesados y el % de frames sin ninguna mano.
 
-from senavoz_training.lsc54 import load_lsc54
+- [ ] **Step 2: Ventanas (Step 2E de la enmienda)**
 
-
-def _hand(x0):
-    return {"x": [x0 + i * 0.01 for i in range(21)], "y": [0.5 - i * 0.02 for i in range(21)],
-            "z": [0.0] * 21}
-
-
-def _video(n_frames=30, with_left=True):
-    return {
-        f"frame_{k}": {"r_hand": _hand(0.3), "l_hand": _hand(0.7) if with_left else None,
-                       "pose": {}, "face": {}}
-        for k in range(n_frames)
-    }
-
-
-def test_reads_rep0_only_and_labels(tmp_path):
-    data = {"Signer_1": {"Cordialidad": {"Hola": {"vid_0": {
-        "rep_0": _video(), "rep_1": _video(), "rep_2": _video()}}}}}
-    (tmp_path / "s1.json").write_text(json.dumps(data), encoding="utf-8")
-    samples = load_lsc54(tmp_path)
-    assert len(samples) == 1
-    signer, sign, seq = samples[0]
-    assert (signer, sign) == ("Signer_1", "Hola")
-    assert seq.shape == (30, 126) and seq.dtype == np.float32
-
-
-def test_missing_hand_becomes_zeros(tmp_path):
-    data = {"Signer_1": {"Cordialidad": {"Hola": {"vid_0": {"rep_0": _video(with_left=False)}}}}}
-    (tmp_path / "s1.json").write_text(json.dumps(data), encoding="utf-8")
-    (_, _, seq), = load_lsc54(tmp_path)
-    left_slot = seq[:, :63]  # ajustar a la correspondencia de FINDINGS.md
-    assert not left_slot.any()
-
-
-def test_resamples_to_30_frames(tmp_path):
-    data = {"Signer_1": {"Cordialidad": {"Hola": {"vid_0": {"rep_0": _video(n_frames=45)}}}}}
-    (tmp_path / "s1.json").write_text(json.dumps(data), encoding="utf-8")
-    (_, _, seq), = load_lsc54(tmp_path)
-    assert seq.shape == (30, 126)
-```
-
-Si la estructura real difiere, adaptar los mini-datasets a ella. Los tres comportamientos se mantienen igual: solo `rep_0`, mano ausente en ceros y 30 frames.
-
-Run: `cd training; .venv\Scripts\python -m pytest tests/test_lsc54.py`
-Expected: FAIL (`ModuleNotFoundError`).
-
-- [ ] **Step 2: Implementación de `lsc54.py`**
-
-```python
-"""Lectura de LSC-54 (Mora-Zarate et al., 2025; CC BY-NC 4.0) a secuencias 30×126."""
-
-import json
-from pathlib import Path
-
-import numpy as np
-
-from senavoz_training.preprocess import normalize_frame
-
-SEQUENCE_LENGTH = 30
-# Correspondencia de FINDINGS.md: qué clave del dataset ocupa la posición 0 (Left) de la app.
-SLOT0_KEY, SLOT1_KEY = "l_hand", "r_hand"
-
-Sample = tuple[str, str, np.ndarray]
-
-
-def _points(hand) -> np.ndarray | None:
-    if not hand or not hand.get("x"):
-        return None
-    pts = np.array([hand["x"], hand["y"], hand["z"]], np.float64).T
-    return None if pts.shape != (21, 3) or not np.abs(pts).sum() else pts
-
-
-def _resample(frames: list[np.ndarray]) -> np.ndarray:
-    idx = np.linspace(0, len(frames) - 1, SEQUENCE_LENGTH).round().astype(int)
-    return np.stack([frames[i] for i in idx]).astype(np.float32)
-
-
-def _frame_key(name: str) -> int:
-    return int(name.rsplit("_", 1)[-1])
-
-
-def load_lsc54(root: Path) -> list[Sample]:
-    """Una muestra por vídeo original (rep_0): las demás repeticiones son traslaciones."""
-    samples: list[Sample] = []
-    for path in sorted(Path(root).rglob("*.json")):
-        data = json.loads(path.read_text(encoding="utf-8"))
-        for signer, topics in data.items():
-            for signs in topics.values():
-                for sign, videos in signs.items():
-                    for reps in videos.values():
-                        rep = reps.get("rep_0")
-                        if not rep:
-                            continue
-                        frames = [
-                            normalize_frame(_points(f.get(SLOT0_KEY)), _points(f.get(SLOT1_KEY)))
-                            for _, f in sorted(rep.items(), key=lambda kv: _frame_key(kv[0]))
-                        ]
-                        if frames:
-                            samples.append((signer, sign, _resample(frames)))
-    return samples
-```
-
-Ajustar `SLOT0_KEY`/`SLOT1_KEY` y `_points` a lo anotado en FINDINGS.md.
+Tests de `training/tests/test_lsc54.py` sobre una caché sintética de `.npy` (deben fallar primero) y después `lsc54.py` con `SEQUENCE_LENGTH = 30` y `Sample = tuple[str, str, np.ndarray]`.
 
 Run: `cd training; .venv\Scripts\python -m pytest tests/test_lsc54.py`
 Expected: PASS
@@ -1280,7 +1206,7 @@ Expected: FAIL
 """Genera el modelo global de SeñaVoz a partir de LSC-54.
 
 Uso (desde training/):
-  python -m senavoz_training.build --data data/lsc54 [--dry-run]
+  python -m senavoz_training.build --data data/lsc54/cache [--dry-run]
 """
 
 import argparse
@@ -1380,13 +1306,13 @@ Expected: PASS
 
 - [ ] **Step 3: Volver a la Tarea 1, Step 4**
 
-Run: `cd training; .venv\Scripts\python -m senavoz_training.build --data data/lsc54 --dry-run`
+Run: `cd training; .venv\Scripts\python -m senavoz_training.build --data data/lsc54/cache --dry-run`
 
 Anotar en FINDINGS.md la precisión por seña y aplicar el criterio para seguir. Si alguna seña de `SIGN_TO_CODE` queda descartada, quitarla de `labels.py` para que el catálogo no la anuncie.
 
 - [ ] **Step 4: Generar el modelo**
 
-Run: `cd training; .venv\Scripts\python -m senavoz_training.build --data data/lsc54`
+Run: `cd training; .venv\Scripts\python -m senavoz_training.build --data data/lsc54/cache`
 Expected: `Modelo escrito en ...sign-model.json (≈ 300–400 KB)`. Comprobar que todas las etiquetas salvo `neutral` están en `SIGN_TO_CODE.values()`.
 
 - [ ] **Step 5: `training/README.md`**
@@ -1403,7 +1329,16 @@ carpeta se despliega.
 LSC-54: Mora-Zarate, Garzón-Castro y Castellanos-Rivillas, *LSC-54: A landmark-based
 dataset for Colombian Sign Language*, Data in Brief 63 (2025) 112145.
 Dataset: https://doi.org/10.57760/sciencedb.25639 — licencia **CC BY-NC 4.0** (uso no comercial,
-con atribución). Descárgalo y descomprímelo en `training/data/lsc54/` (no se versiona).
+con atribución). No se versiona.
+
+No se usa el `datos.json` del dataset (51 GB, extraído con MediaPipe Holistic): se descargan solo los
+vídeos crudos (`RawVideos/*.zip`, ~970 MB, enlaces en `FINDINGS.md`) en `training/data/lsc54/RawVideos/`
+y se extraen los landmarks con el mismo Hand Landmarker que usa la app, para que entrenamiento y app
+vean exactamente los mismos puntos:
+
+    .venv\Scripts\python -m senavoz_training.extract --zips data/lsc54/RawVideos --cache data/lsc54/cache
+
+La extracción guarda una caché `.npy` por vídeo y no repite los ya procesados.
 
 ## Entrenar
 
@@ -1411,8 +1346,8 @@ con atribución). Descárgalo y descomprímelo en `training/data/lsc54/` (no se 
     python -m venv .venv
     .venv\Scripts\pip install -r requirements.txt
     .venv\Scripts\python -m pytest
-    .venv\Scripts\python -m senavoz_training.build --data data/lsc54 --dry-run   # solo métricas
-    .venv\Scripts\python -m senavoz_training.build --data data/lsc54             # escribe el modelo
+    .venv\Scripts\python -m senavoz_training.build --data data/lsc54/cache --dry-run   # solo métricas
+    .venv\Scripts\python -m senavoz_training.build --data data/lsc54/cache       # escribe el modelo
 
 Solo se exportan las señas con ≥ 80 % de acierto en validación con personas no vistas.
 

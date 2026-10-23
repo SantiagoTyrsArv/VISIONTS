@@ -13,6 +13,19 @@ DEFAULT_PHRASES: list[tuple[str, str]] = [
     ("thanks", "Gracias"),
     ("repeat", "¿Puedes repetir, por favor?"),
     ("moment", "Necesito un momento"),
+    # Frases con seña en el modelo global (training/senavoz_training/labels.py; un test de
+    # training/ comprueba que cada seña tiene aquí su frase). Sin seña exportada, van por clic.
+    ("hello", "Hola"),
+    ("bye", "Hasta luego"),
+    ("good_morning", "Buenos días"),
+    ("good_afternoon", "Buenas tardes"),
+    ("good_evening", "Buenas noches"),
+    ("good", "Bien"),
+    ("bad", "Mal"),
+    ("help", "Necesito ayuda"),
+    ("sorry", "Perdón"),
+    ("please", "Por favor"),
+    ("welcome", "De nada"),
 ]
 
 

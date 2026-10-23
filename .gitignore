@@ -8,3 +8,8 @@ __pycache__/
 dist/
 coverage/
 .superpowers/
+
+# Dataset LSC-54 (no se versiona: tamaño y licencia)
+training/data/
+training/scripts/explore.py
+training/.venv/

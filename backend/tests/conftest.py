@@ -65,28 +65,3 @@ def tokens(client, registered):
     )
     assert r.status_code == 200
     return r.json()
-
-
-def auth_headers(client, email: str) -> dict[str, str]:
-    """Registra (si hace falta) e inicia sesión con otro usuario; devuelve la cabecera Bearer."""
-    body = {"email": email, "password": "clave1234", "display_name": "Otro"}
-    client.post("/auth/register", json=body)
-    r = client.post("/auth/login", json={"email": email, "password": "clave1234"})
-    assert r.status_code == 200
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}
-
-
-@pytest.fixture()
-def auth(client, tokens):
-    return {"Authorization": f"Bearer {tokens['access_token']}"}
-
-
-def add_samples(db, user_id, label: str, n: int) -> None:
-    """Inserta n muestras válidas (todo ceros) directamente en la BD."""
-    import struct
-
-    from app.db.models import SignSample
-
-    zeros = struct.pack("<3780f", *([0.0] * 3780))
-    db.add_all(SignSample(user_id=user_id, label=label, data=zeros) for _ in range(n))
-    db.commit()
