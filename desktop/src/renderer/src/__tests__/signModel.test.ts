@@ -51,4 +51,12 @@ describe('useSignModel (modelo empaquetado)', () => {
     });
     expect(useSignModel.getState().status).toBe('error');
   });
+
+  it('carga el modelo empaquetado (generado por training/)', async () => {
+    await useSignModel.getState().load();
+    const s = useSignModel.getState();
+    expect(s.status).toBe('ready');
+    expect(s.labels).toContain('neutral');
+    expect(signLabels(s).length).toBeGreaterThanOrEqual(2);
+  });
 });

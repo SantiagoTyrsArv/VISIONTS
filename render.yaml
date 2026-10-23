@@ -1,0 +1,27 @@
+# Blueprint de Render: API de SeñaVoz (spec docs/superpowers/specs/2026-10-23-backend-deploy-design.md).
+# La base de datos vive en Neon; su URL se pega en Render al crear el Blueprint y no se versiona.
+services:
+  - type: web
+    name: senavoz-api
+    runtime: docker
+    plan: free
+    region: virginia
+    branch: main
+    # Solo los cambios en backend/ redespliegan; rutas de Docker relativas a la raíz del repo.
+    rootDir: backend
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    # Despliega cada commit de main solo si pasan los checks de GitHub Actions (ci.yml).
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: app://senavoz
+      # Límite por IP según X-Forwarded-For: sin esto todos compartirían la IP del proxy. El cliente
+      # puede falsificar esa IP; la fuerza bruta la frena el límite por cuenta (RATE_LIMIT_LOGIN_ACCOUNT).
+      - key: FORWARDED_ALLOW_IPS
+        value: '*'

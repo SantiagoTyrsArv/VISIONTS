@@ -171,3 +171,17 @@ Mejora opcional, fuera de este plan: preentrenar la GRU con un dataset grande de
 ## Extracción (Tarea 5, 2026-10-20)
 
 `python -m senavoz_training.extract` sobre los tres zips de `RawVideos/` (MD5 comprobados): **2880 vídeos** procesados (Cordialidad 1198, Colores 1110, Numeros 542 + `Números` 30: el zip trae las dos grafías), 75 358 frames guardados (uno de cada 2). **28,3 % de los frames sin ninguna mano** (sobre todo al principio y al final de cada vídeo, con las manos bajadas); 43 vídeos no tienen manos en ningún frame y `load_lsc54` los descarta. Las señas de `SIGN_TO_CODE` tienen 18 personas, salvo `Si`, `No` y `Gracias` (9).
+
+## Modelo final (2026-10-23)
+
+Validación cruzada por persona sin fuga: la parada temprana de cada modelo usa un grupo de personas distinto del que se mide (antes eran las mismas, lo que inflaba el acierto unos 5–10 puntos justo en el umbral).
+
+| seña | acierto (personas no vistas) | antes, con fuga |
+| --- | --- | --- |
+| good_morning | **0,86** | 0,93 |
+| good_afternoon | **0,81** | 0,89 |
+| neutral | 0,99 | 0,98 |
+
+`good_evening`, `please`, `help` y `bad` (0,80–0,94 con fuga) quedan por debajo del 80 % y pasan a `neutral`. `val_accuracy` global: 0,986, dominado por `neutral`.
+
+**Decisión del autor:** se acepta el modelo con 2 señas aunque la spec pedía 4. El catálogo es mixto: el resto de frases se dice con clic o atajo. Mejora posible, fuera de alcance: preentrenar con un dataset grande de otra lengua de señas.

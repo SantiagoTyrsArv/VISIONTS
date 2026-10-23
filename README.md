@@ -69,7 +69,7 @@ Access token: 15 min. Refresh token: 7 días, `secrets.token_urlsafe`, guardado 
 
 Nota: el límite de peticiones usa la memoria del proceso. Con varios workers o réplicas habría que moverlo a Redis.
 
-Para desplegar (Neon + Render), la API acepta la `DATABASE_URL` tal como la da Neon (`postgresql://…?sslmode=require`) y escucha en `$PORT`. Detrás del proxy de Render hay que definir `FORWARDED_ALLOW_IPS=*`: si no, el límite por IP vería a todos los usuarios como uno solo.
+Para desplegar (Neon + Render), la API acepta la `DATABASE_URL` tal como la da Neon (`postgresql://…?sslmode=require`) y escucha en `$PORT`. Detrás del proxy de Render hay que definir `FORWARDED_ALLOW_IPS=*`: si no, el límite por IP vería a todos los usuarios como uno solo. Esa IP sale de `X-Forwarded-For` y el cliente puede falsificarla, así que el login lleva además un límite por cuenta (`RATE_LIMIT_LOGIN_ACCOUNT`, 10 intentos por hora y correo) que frena la fuerza bruta.
 
 ## App de escritorio
 

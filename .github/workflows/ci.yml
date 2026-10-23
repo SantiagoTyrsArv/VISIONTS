@@ -1,0 +1,64 @@
+name: CI
+
+# Render despliega main solo cuando estos checks pasan (render.yaml: autoDeployTrigger).
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      # Valores solo de prueba, no secretos reales.
+      JWT_SECRET: ci-only-secret-ci-only-secret-ci-only
+      DATABASE_URL: sqlite://
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12' # la de la imagen Docker que se despliega
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -q
+
+  desktop:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+  training:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: training
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14' # la del entorno local de entrenamiento
+          cache: pip
+          cache-dependency-path: training/requirements.txt
+      # MediaPipe (tests de extract.py) carga libEGL/libGLES aunque use la CPU.
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libegl1 libgles2
+      - run: pip install -r requirements.txt
+      - run: pytest -q

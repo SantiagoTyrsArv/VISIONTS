@@ -12,6 +12,8 @@ SeñaVoz es el proyecto final de una materia universitaria con alcance fijo: se 
 
 **Criterio de éxito:** tras instalar e iniciar sesión, sin ningún paso de entrenamiento, la pantalla Cámara y el Modo reunión dicen la frase cuando el usuario hace una de las señas incluidas. La app indica qué frases tienen seña. Cada seña incluida alcanza al menos un 80 % de acierto en validación con **personas que el modelo no vio al entrenar**. Tests en verde.
 
+> **Enmienda 2026-10-23:** con la validación por persona sin fuga solo pasan 2 señas (`good_morning` 0,86 y `good_afternoon` 0,81). El autor acepta el modelo con 2 señas en lugar de 4; el resto de frases va por clic y atajos. Detalle en `training/FINDINGS.md`, "Modelo final".
+
 Este es el subproyecto 1 de 2. El subproyecto 2, que despliega el backend en Neon y Render, tiene su propia spec y se beneficia de este, porque la API deja de tener PyTorch, el servicio trainer y dos tablas.
 
 ## Decisiones tomadas
