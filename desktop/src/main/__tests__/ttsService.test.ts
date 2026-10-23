@@ -1,3 +1,4 @@
+import { basename, join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -8,6 +9,8 @@ import {
   type TtsDeps,
 } from '../tts/ttsService';
 
+// Rutas del sistema donde corre el test: el servicio las une con path.join.
+const CACHE = resolve('/cache');
 const WAV = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(60, 1)]);
 
 /** Disco en memoria y un "script" que escribe un WAV en cada outPath pedido. */
@@ -22,7 +25,7 @@ function fakeDeps() {
     });
   });
   const deps: TtsDeps = {
-    cacheDir: 'C:\\cache',
+    cacheDir: CACHE,
     run,
     fs: {
       readFile: async (p) => {
@@ -30,7 +33,7 @@ function fakeDeps() {
         if (!v) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
         return v;
       },
-      readdir: async () => [...files.keys()].map((p) => p.split('\\').pop()!),
+      readdir: async () => [...files.keys()].map((p) => basename(p)),
       rm: async (p) => void files.delete(p),
       mkdir: async () => {},
     },
@@ -73,7 +76,7 @@ describe('ttsService', () => {
 
   it('un archivo dañado se borra y se regenera', async () => {
     const { deps, files, run } = fakeDeps();
-    files.set(`C:\\cache\\${ttsFileName(item)}`, Buffer.from('basura'));
+    files.set(join(CACHE, ttsFileName(item)), Buffer.from('basura'));
     const [r] = await createTtsService(deps).synthesize([item]);
     expect(r.ok).toBe(true);
     expect(run).toHaveBeenCalledTimes(1);
@@ -102,7 +105,7 @@ describe('ttsService', () => {
     const tts = createTtsService(deps);
     await tts.synthesize([item, { ...item, rate: 1.5 }]);
     await tts.prune({ voiceId: 'v1', rate: 1 });
-    expect([...files.keys()]).toEqual([`C:\\cache\\${ttsFileName(item)}`]);
+    expect([...files.keys()]).toEqual([join(CACHE, ttsFileName(item))]);
   });
 
   it('voices devuelve la lista del script', async () => {
