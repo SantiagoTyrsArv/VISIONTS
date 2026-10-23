@@ -5,10 +5,13 @@ import { API_URL } from '@/config/env';
 
 import type { TokenPair } from './types';
 
-export const http = axios.create({ baseURL: API_URL, timeout: 15000 });
+// Render gratuito duerme la API tras 15 min sin uso y tarda 30–60 s en despertar.
+export const REQUEST_TIMEOUT_MS = 60_000;
+
+export const http = axios.create({ baseURL: API_URL, timeout: REQUEST_TIMEOUT_MS });
 
 // Cliente "limpio" sin interceptores, para /auth/refresh (evita bucles).
-const bare = axios.create({ baseURL: API_URL, timeout: 15000 });
+const bare = axios.create({ baseURL: API_URL, timeout: REQUEST_TIMEOUT_MS });
 
 let onAuthFailure: () => void = () => {};
 

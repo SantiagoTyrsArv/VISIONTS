@@ -31,7 +31,7 @@ axios.defaults.adapter = (config: InternalAxiosRequestConfig) => {
   return retryShouldFail ? respond(config, 500) : respond(config, 200, { ok: true });
 };
 
-const { http, setAuthFailureHandler } = await import('@/api/client');
+const { http, REQUEST_TIMEOUT_MS, setAuthFailureHandler } = await import('@/api/client');
 
 beforeEach(async () => {
   refreshCalls = 0;
@@ -41,6 +41,11 @@ beforeEach(async () => {
 });
 
 describe('cliente HTTP', () => {
+  it('espera hasta 60 s: Render gratuito tarda en despertar', () => {
+    expect(REQUEST_TIMEOUT_MS).toBe(60_000);
+    expect(http.defaults.timeout).toBe(REQUEST_TIMEOUT_MS);
+  });
+
   it('ante varios 401 concurrentes hace UN solo refresh y reintenta todos', async () => {
     const results = await Promise.all([http.get('/a'), http.get('/b'), http.get('/c')]);
 
