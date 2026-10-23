@@ -71,6 +71,26 @@ Nota: el límite de peticiones usa la memoria del proceso. Con varios workers o 
 
 Para desplegar (Neon + Render), la API acepta la `DATABASE_URL` tal como la da Neon (`postgresql://…?sslmode=require`) y escucha en `$PORT`. Detrás del proxy de Render hay que definir `FORWARDED_ALLOW_IPS=*`: si no, el límite por IP vería a todos los usuarios como uno solo. Esa IP sale de `X-Forwarded-For` y el cliente puede falsificarla, así que el login lleva además un límite por cuenta (`RATE_LIMIT_LOGIN_ACCOUNT`: 20 contraseñas fallidas por hora y correo; un login correcto lo reinicia) que frena la fuerza bruta. Riesgo aceptado: quien conozca un correo puede bloquear esa cuenta durante una hora fallando 20 veces.
 
+## Despliegue
+
+La API está en **<https://senavoz-api.onrender.com>** (Render, plan gratuito) y la base de datos en **Neon** (Postgres 17, AWS us-east-1). GitHub Actions (`.github/workflows/ci.yml`) ejecuta los tests de `backend/`, `desktop/` y `training/` en cada push. Render despliega cada commit de `main` que cambie `backend/`, pero solo si esos checks pasan (`render.yaml`, `autoDeployTrigger: checksPass`).
+
+Para montarlo desde cero:
+
+1. **Neon** → New project (AWS us-east-1). Copia la cadena de conexión **directa**: sin `-pooler` en el host.
+2. **Render** → New → Blueprint → este repo. Pega esa cadena en `DATABASE_URL` y pulsa Apply. `JWT_SECRET` se genera solo. Las rutas de Docker de `render.yaml` son relativas a `rootDir: backend`.
+3. La app toma la URL de `desktop/.env.production` al compilar (`npm run build:win`).
+
+**Antes de una demo, despierta la API:** abre <https://senavoz-api.onrender.com/health>. En el plan gratuito, Render se duerme tras 15 minutos sin uso y tarda unos 30–60 s en arrancar. La app espera hasta 60 s por petición.
+
+Verificado el 23/10/2026:
+
+- `/health` responde `{"status":"ok"}`, `/phrases` sin token devuelve 401 y el preflight CORS desde `app://senavoz` se acepta.
+- El instalador de `build:win` lleva `connect-src 'self' https://senavoz-api.onrender.com` en la CSP y ninguna referencia a `localhost`.
+- La app instalada se registra, inicia sesión y dice frases contra la API de producción.
+
+Sin verificar: el login tras 15 minutos de inactividad (arranque en frío), el contenido de las tablas en Neon y que un push a `main` con cambios en `backend/` se despliegue solo.
+
 ## App de escritorio
 
 ```bash
@@ -83,7 +103,7 @@ npm run build:win           # instalador en desktop/release/SenaVoz-Setup-<versi
 
 **`build:win` exige el modelo de señas** (`desktop/src/renderer/src/assets/sign-model.json`, lo genera `training/`). Sin él, `npm run dev` y los tests funcionan, pero la app muestra "Reconocimiento de señas no disponible" y solo dice frases con clic o atajo.
 
-**`RENDERER_VITE_API_URL` se fija al compilar**, porque también se escribe en la CSP de `index.html`. Si la cambias, hay que recompilar. Debe ser alcanzable desde el PC (normalmente `http://localhost:8000`).
+**`RENDERER_VITE_API_URL` se fija al compilar**, porque también se escribe en la CSP de `index.html`. Si la cambias, hay que recompilar. `npm run dev` usa `.env` (normalmente `http://localhost:8000`) y `build:win` usa `.env.production` (la API de Render).
 
 ### Uso
 
