@@ -15,6 +15,8 @@ from app.core.security import (
 from app.db.models import RefreshToken, User
 from app.schemas.auth import RegisterIn, TokenPair
 
+INVALID_SESSION = "Sesión inválida"
+
 
 class AuthError(Exception):
     """Error de autenticación con mensaje genérico apto para el cliente."""
@@ -93,21 +95,21 @@ def refresh(db: Session, raw_token: str) -> TokenPair:
         select(RefreshToken).where(RefreshToken.token_hash == hash_refresh_token(raw_token))
     )
     if row is None:
-        raise AuthError("Sesión inválida")
+        raise AuthError(INVALID_SESSION)
 
     if row.revoked_at is not None:
         # Reutilización de un token ya rotado/revocado: posible robo. Se cierran
         # todas las sesiones del usuario y se persiste antes de rechazar.
         _revoke_all(db, row.user_id)
         db.commit()
-        raise AuthError("Sesión inválida")
+        raise AuthError(INVALID_SESSION)
 
     if _aware(row.expires_at) <= _now():
         raise AuthError("Sesión expirada")
 
     user = db.get(User, row.user_id)
     if user is None or not user.is_active:
-        raise AuthError("Sesión inválida")
+        raise AuthError(INVALID_SESSION)
 
     pair, new_row = _issue_pair(db, user)
     row.revoked_at = _now()

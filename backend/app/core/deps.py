@@ -1,4 +1,5 @@
 import uuid
+from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -10,10 +11,13 @@ from app.db.session import get_db
 
 _bearer = HTTPBearer(auto_error=False)
 
+# Dependencias de las rutas, como tipos para no repetir Depends(...) en cada firma.
+DbSession = Annotated[Session, Depends(get_db)]
+
 
 def get_current_user(
-    creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    db: Session = Depends(get_db),
+    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    db: DbSession,
 ) -> User:
     unauthorized = HTTPException(
         status.HTTP_401_UNAUTHORIZED,
@@ -32,3 +36,6 @@ def get_current_user(
     if user is None or not user.is_active:
         raise unauthorized
     return user
+
+
+CurrentUser = Annotated[User, Depends(get_current_user)]

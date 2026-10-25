@@ -3,7 +3,6 @@ from datetime import datetime, timedelta, timezone
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from app.core.rate_limit import limiter
 from app.core.security import hash_refresh_token
 from app.db.models import RefreshToken, User
 from app.main import app
@@ -24,7 +23,8 @@ def test_register_ok_lowercases_email_and_hides_hash(client, db_session):
     body = r.json()
     assert body["email"] == "ana@example.com"
     assert body["display_name"] == "Ana"
-    assert "password" not in body and "password_hash" not in body
+    assert "password" not in body
+    assert "password_hash" not in body
     stored = db_session.scalar(select(User))
     assert stored.password_hash.startswith("$argon2")
 
@@ -49,7 +49,8 @@ def test_login_ok(client, registered):
     body = r.json()
     assert body["token_type"] == "bearer"
     assert body["expires_in"] == 15 * 60
-    assert body["access_token"] and body["refresh_token"]
+    assert body["access_token"]
+    assert body["refresh_token"]
 
 
 def test_login_wrong_password_and_unknown_email_are_indistinguishable(client, registered):
@@ -59,19 +60,13 @@ def test_login_wrong_password_and_unknown_email_are_indistinguishable(client, re
     assert bad_pw.json() == no_user.json()
 
 
-def test_login_rate_limited(client, registered):
-    limiter.enabled = True
-    limiter.reset()
-    try:
-        codes = [
-            client.post(
-                "/auth/login", json={"email": "ana@example.com", "password": "mala12345"}
-            ).status_code
-            for _ in range(7)
-        ]
-    finally:
-        limiter.enabled = False
-        limiter.reset()
+def test_login_rate_limited(client, registered, rate_limited):
+    codes = [
+        client.post(
+            "/auth/login", json={"email": "ana@example.com", "password": "mala12345"}
+        ).status_code
+        for _ in range(7)
+    ]
     assert codes[:5] == [401] * 5
     assert 429 in codes[5:]
 
@@ -106,7 +101,8 @@ def test_refresh_rotates_and_invalidates_old_token(client, tokens, db_session):
     old_row = db_session.scalar(
         select(RefreshToken).where(RefreshToken.token_hash == hash_refresh_token(old))
     )
-    assert old_row.revoked_at is not None and old_row.replaced_by is not None
+    assert old_row.revoked_at is not None
+    assert old_row.replaced_by is not None
 
 
 def test_refresh_reuse_revokes_all_sessions(client, tokens):
@@ -160,45 +156,33 @@ def test_logout_is_idempotent_for_unknown_token(client):
     assert client.post("/auth/logout", json={"refresh_token": "nope"}).status_code == 204
 
 
-def test_login_limited_per_account_even_if_the_ip_changes(client, registered):
+def test_login_limited_per_account_even_if_the_ip_changes(client, registered, rate_limited):
     # Detrás de un proxy, la IP sale de X-Forwarded-For y el cliente puede inventarla:
     # el límite por cuenta frena la fuerza bruta aunque cada intento llegue de otra IP.
-    limiter.enabled = True
-    limiter.reset()
-    try:
-        codes = []
-        for i in range(22):
-            with TestClient(app, client=(f"203.0.113.{i}", 50000)) as other_ip:
-                codes.append(
-                    other_ip.post(
-                        "/auth/login", json={"email": "ANA@example.com", "password": "mala12345"}
-                    ).status_code
-                )
-    finally:
-        limiter.enabled = False
-        limiter.reset()
+    codes = []
+    for i in range(22):
+        with TestClient(app, client=(f"203.0.113.{i}", 50000)) as other_ip:
+            codes.append(
+                other_ip.post(
+                    "/auth/login", json={"email": "ANA@example.com", "password": "mala12345"}
+                ).status_code
+            )
     assert codes[:20] == [401] * 20
     assert codes[20:] == [429, 429]
 
 
-def test_only_failed_logins_count_and_a_success_resets_them(client, registered):
+def test_only_failed_logins_count_and_a_success_resets_them(client, registered, rate_limited):
     # Si contaran los aciertos (o no se reiniciaran), un tercero con el correo de la víctima
     # la dejaría fuera con menos intentos, y la propia usuaria se bloquearía al entrar a menudo.
-    limiter.enabled = True
-    limiter.reset()
     bad = {"email": USER["email"], "password": "mala12345"}
     good = {"email": USER["email"], "password": USER["password"]}
-    try:
-        codes = []
-        for i in range(19):
-            with TestClient(app, client=(f"198.51.100.{i}", 50000)) as c:
-                codes.append(c.post("/auth/login", json=bad).status_code)
-        with TestClient(app, client=("198.51.100.200", 50000)) as c:
-            assert c.post("/auth/login", json=good).status_code == 200
-        for i in range(19):
-            with TestClient(app, client=(f"192.0.2.{i}", 50000)) as c:
-                codes.append(c.post("/auth/login", json=bad).status_code)
-    finally:
-        limiter.enabled = False
-        limiter.reset()
+    codes = []
+    for i in range(19):
+        with TestClient(app, client=(f"198.51.100.{i}", 50000)) as c:
+            codes.append(c.post("/auth/login", json=bad).status_code)
+    with TestClient(app, client=("198.51.100.200", 50000)) as c:
+        assert c.post("/auth/login", json=good).status_code == 200
+    for i in range(19):
+        with TestClient(app, client=(f"192.0.2.{i}", 50000)) as c:
+            codes.append(c.post("/auth/login", json=bad).status_code)
     assert codes == [401] * 38

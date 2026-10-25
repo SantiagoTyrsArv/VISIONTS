@@ -10,7 +10,7 @@ from app.core.config import get_settings
 BACKEND = Path(__file__).resolve().parents[1]
 
 
-@pytest.fixture()
+@pytest.fixture
 def alembic_cfg(tmp_path, monkeypatch):
     url = f"sqlite:///{(tmp_path / 'm.db').as_posix()}"
     monkeypatch.setenv("DATABASE_URL", url)
