@@ -35,7 +35,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
     "axios": "^1.20.0",
-    "electron": "^44.5.0",
+    "electron": "^44.9.1",
     "electron-builder": "^26.0.12",
     "electron-vite": "^5.0.0",
     "eslint": "^9.39.1",
@@ -49,9 +49,9 @@
     "react-hook-form": "^7.89.0",
     "react-router": "^8.4.0",
     "typescript": "^5.9.3",
-    "vite": "^7.2.6",
-    "vitest": "^5.0.2",
-    "zod": "^4.6.5",
+    "vite": "^7.3.7",
+    "vitest": "^5.0.5",
+    "zod": "^4.6.7",
     "zustand": "^5.0.15"
   },
   "allowScripts": {
