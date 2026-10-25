@@ -58,8 +58,8 @@ jobs:
         with:
           python-version: '3.14' # la del entorno local de entrenamiento
           cache: pip
-          cache-dependency-path: training/requirements.txt
+          cache-dependency-path: training/requirements-ci.lock
       # MediaPipe (tests de extract.py) carga libEGL/libGLES aunque use la CPU.
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libegl1 libgles2
-      - run: 'pip install --only-binary :all: -r requirements.txt'
+      - run: 'pip install --require-hashes --only-binary :all: -r requirements-ci.lock'
       - run: pytest -q

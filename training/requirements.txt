@@ -1,3 +1,5 @@
+# Tras editarlo, regenerar el lock del CI (Linux, Python 3.14) con versiones y hashes:
+#   uv pip compile requirements.txt --python-version 3.14 --python-platform x86_64-manylinux_2_28 --generate-hashes --emit-index-url --index-strategy unsafe-best-match -o requirements-ci.lock
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.14.1+cpu
 numpy==2.5.3

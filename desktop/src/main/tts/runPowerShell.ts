@@ -5,7 +5,7 @@ import type { ScriptRunner } from './ttsService';
 
 // Ruta absoluta: buscar "powershell.exe" en PATH permitiría ejecutar otro binario con ese nombre.
 const POWERSHELL = win32.join(
-  process.env.SystemRoot ?? 'C:\\Windows',
+  process.env.SystemRoot ?? String.raw`C:\Windows`,
   'System32',
   'WindowsPowerShell',
   'v1.0',
