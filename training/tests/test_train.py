@@ -57,8 +57,9 @@ def test_time_budget():
 
 
 def test_needs_two_labels():
+    samples = [("S0", "neutral", np.zeros((30, 126), np.float32))]
     with pytest.raises(ValueError):
-        train_model([("S0", "neutral", np.zeros((30, 126), np.float32))])
+        train_model(samples)
 
 
 def test_validation_uses_unseen_signers():
@@ -78,7 +79,9 @@ def test_mirror_swaps_hands_and_negates_x():
     x[0, :, 0] = 0.5   # x del primer punto de la mano izquierda
     x[0, :, 1] = 0.25  # y
     m = mirror(x)
-    assert m[0, 0, 63] == -0.5 and m[0, 0, 64] == 0.25 and not m[0, :, :63].any()
+    assert m[0, 0, 63] == -0.5
+    assert m[0, 0, 64] == 0.25
+    assert not m[0, :, :63].any()
 
 
 def test_time_warp_keeps_shape():

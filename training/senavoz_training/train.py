@@ -82,6 +82,46 @@ def augment(batch: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     return out
 
 
+def _train_epoch(
+    model: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    loss_fn: nn.Module,
+    x_tr: np.ndarray,
+    y_tr: np.ndarray,
+    rng: np.random.Generator,
+    batch_size: int,
+    out_of_time: Callable[[], bool],
+) -> None:
+    """Una pasada por el entrenamiento en lotes aumentados y barajados."""
+    model.train()
+    order = rng.permutation(len(x_tr))
+    for i in range(0, len(order), batch_size):
+        idx = order[i : i + batch_size]
+        xb = torch.from_numpy(augment(x_tr[idx], rng))
+        yb = torch.from_numpy(y_tr[idx])
+        optimizer.zero_grad()
+        loss_fn(model(xb), yb).backward()
+        optimizer.step()
+        if out_of_time():
+            raise TrainingTimeout("El entrenamiento superó el tiempo máximo")
+
+
+def _accuracy(
+    model: nn.Module, labels: list[str], x_ev: np.ndarray, y_ev: np.ndarray
+) -> tuple[float | None, dict[str, float]]:
+    """Acierto global (None sin muestras de evaluación) y por seña."""
+    measured = len(x_ev) > 0
+    with torch.no_grad():
+        pred = model(torch.from_numpy(x_ev)).argmax(dim=1).numpy() if measured else y_ev
+    # Una seña sin personas en validación no tiene acierto medible: no se incluye.
+    per_label = {
+        label: round(float((pred[y_ev == k] == k).mean()), 4)
+        for k, label in enumerate(labels)
+        if (y_ev == k).any()
+    }
+    return (round(float((pred == y_ev).mean()), 4) if measured else None), per_label
+
+
 def train_model(
     samples: list[Sample],
     *,
@@ -124,18 +164,11 @@ def train_model(
     best_loss, best_state, stale = math.inf, copy.deepcopy(model.state_dict()), 0
     best_epoch = 0
 
+    def out_of_time() -> bool:
+        return clock() - start > time_budget_s
+
     for epoch in range(1, max_epochs + 1):
-        model.train()
-        order = rng.permutation(len(x_tr))
-        for i in range(0, len(order), batch_size):
-            idx = order[i : i + batch_size]
-            xb = torch.from_numpy(augment(x_tr[idx], rng))
-            yb = torch.from_numpy(y_tr[idx])
-            optimizer.zero_grad()
-            loss_fn(model(xb), yb).backward()
-            optimizer.step()
-            if clock() - start > time_budget_s:
-                raise TrainingTimeout("El entrenamiento superó el tiempo máximo")
+        _train_epoch(model, optimizer, loss_fn, x_tr, y_tr, rng, batch_size, out_of_time)
         if not validate:
             best_state, best_epoch = model.state_dict(), epoch
             continue
@@ -156,17 +189,9 @@ def train_model(
         _, _, x_ev, y_ev = _split(held_out, (), labels, set(test_signers))
     else:
         x_ev, y_ev = x_va, y_va
-    measured = len(x_ev) > 0
-    with torch.no_grad():
-        pred = model(torch.from_numpy(x_ev)).argmax(dim=1).numpy() if measured else y_ev
-    # Una seña sin personas en validación no tiene acierto medible: no se incluye.
-    per_label = {
-        label: round(float((pred[y_ev == k] == k).mean()), 4)
-        for k, label in enumerate(labels)
-        if (y_ev == k).any()
-    }
+    val_accuracy, per_label = _accuracy(model, labels, x_ev, y_ev)
     metrics = {
-        "val_accuracy": round(float((pred == y_ev).mean()), 4) if measured else None,
+        "val_accuracy": val_accuracy,
         "per_label": per_label,
         "samples": {
             label: sum(1 for _, l, _ in [*samples, *held_out] if l == label) for label in labels

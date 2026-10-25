@@ -19,7 +19,8 @@ def test_signer_and_sign_come_from_the_path(tmp_path):
     _save(tmp_path, "Cordialidad", "Baño", "7__2", _video(40))
     (signer, sign, seq), = load_lsc54(tmp_path)
     assert (signer, sign) == ("7", "Baño")
-    assert seq.shape == (SEQUENCE_LENGTH, 126) and seq.dtype == np.float32
+    assert seq.shape == (SEQUENCE_LENGTH, 126)
+    assert seq.dtype == np.float32
 
 
 def test_long_video_is_centered_on_the_hands(tmp_path):
@@ -27,7 +28,9 @@ def test_long_video_is_centered_on_the_hands(tmp_path):
     (_, _, seq), = load_lsc54(tmp_path)
     with_hands = np.flatnonzero(seq.any(axis=1))
     assert len(with_hands) == 10
-    assert with_hands[0] == 10 and with_hands[-1] == 19  # 10 frames sin manos a cada lado
+    # 10 frames sin manos a cada lado
+    assert with_hands[0] == 10
+    assert with_hands[-1] == 19
 
 
 def test_window_stays_inside_the_video(tmp_path):
@@ -39,7 +42,8 @@ def test_window_stays_inside_the_video(tmp_path):
 def test_short_video_is_padded_with_no_hands_on_both_sides(tmp_path):
     _save(tmp_path, "Cordialidad", "Hola", "1__0", _video(20))
     (_, _, seq), = load_lsc54(tmp_path)
-    assert not seq[:5].any() and not seq[25:].any()
+    assert not seq[:5].any()
+    assert not seq[25:].any()
     np.testing.assert_array_equal(seq[5:25], _video(20))
 
 
