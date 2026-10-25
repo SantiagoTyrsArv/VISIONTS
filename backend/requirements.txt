@@ -9,3 +9,7 @@ email-validator==2.3.0
 argon2-cffi==25.1.0
 pyjwt==2.15.1
 slowapi==0.1.10
+# Mínimos de dependencias transitivas con vulnerabilidades conocidas (ver VULNERABILIDADES.md)
+anyio>=4.14.2
+h11>=0.16.0
+idna>=3.15
