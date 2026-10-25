@@ -26,7 +26,7 @@ jobs:
           python-version: '3.12' # la de la imagen Docker que se despliega
           cache: pip
           cache-dependency-path: backend/requirements-dev.lock
-      - run: pip install --require-hashes --only-binary :all: -r requirements-dev.lock
+      - run: 'pip install --require-hashes --only-binary :all: -r requirements-dev.lock'
       - run: pytest -q
 
   desktop:
@@ -61,5 +61,5 @@ jobs:
           cache-dependency-path: training/requirements.txt
       # MediaPipe (tests de extract.py) carga libEGL/libGLES aunque use la CPU.
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libegl1 libgles2
-      - run: pip install --only-binary :all: -r requirements.txt
+      - run: 'pip install --only-binary :all: -r requirements.txt'
       - run: pytest -q
