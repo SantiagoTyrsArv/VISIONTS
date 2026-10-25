@@ -8,7 +8,7 @@ export const MAX_HANDS = 2;
 export const VALUES_PER_FRAME = VALUES_PER_HAND * MAX_HANDS;
 export const SEQUENCE_LENGTH = 30;
 
-const zeroHand = (): number[] => Array<number>(VALUES_PER_HAND).fill(0);
+const zeroHand = (): number[] => new Array<number>(VALUES_PER_HAND).fill(0);
 
 /** Distancia mínima muñeca–nudillo medio; por debajo, la mano se trata como ausente. */
 export const SCALE_EPSILON = 1e-6;

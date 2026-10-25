@@ -8,7 +8,8 @@ from typing import Annotated
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = "postgresql+psycopg://senavoz:senavoz@localhost:5432/senavoz"
+    # Obligatoria: sin valor por defecto para no llevar credenciales en el código (.env.example).
+    database_url: str
     jwt_secret: str = Field(min_length=32)
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 15

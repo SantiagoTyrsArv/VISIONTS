@@ -17,4 +17,5 @@ def test_neutral_mixes_zeros_and_still_hands():
 
 def test_codes_are_unique_and_not_neutral():
     codes = list(SIGN_TO_CODE.values())
-    assert len(codes) == len(set(codes)) and NEUTRAL not in codes
+    assert len(codes) == len(set(codes))
+    assert NEUTRAL not in codes

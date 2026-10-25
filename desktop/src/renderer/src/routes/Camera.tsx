@@ -13,7 +13,7 @@ import styles from './routes.module.css';
 
 const RECENT = 5;
 
-function Status({ ok, label }: { ok: boolean; label: string }) {
+function Status({ ok, label }: Readonly<{ ok: boolean; label: string }>) {
   return (
     <span className={ok ? styles.statusValue : `${styles.statusValue} ${styles.statusWarn}`}>
       <span className={ok ? styles.dotLive : styles.dotWarn} aria-hidden />
@@ -75,10 +75,10 @@ export default function Camera(): JSX.Element {
               <Button label={t('camera.retry')} onClick={retry} />
             </div>
           ) : (
-            <span role="status" className={styles.chip}>
+            <output className={styles.chip}>
               <span className={hands ? styles.dotLive : styles.dotWarn} aria-hidden />
               {cam.kind === 'starting' ? t('camera.starting') : t(visionMessageKey(recognition))}
-            </span>
+            </output>
           )}
           {recent[0] ? (
             <p className={styles.signBanner}>{t('camera.signDetected', { text: recent[0] })}</p>

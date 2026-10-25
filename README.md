@@ -36,7 +36,7 @@ Levanta `db` (Postgres 17) y `api`. Al arrancar, el contenedor ejecuta `alembic 
 ```bash
 cd backend
 python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
-pip install -r requirements-dev.txt
+pip install --require-hashes -r requirements-dev.lock
 cp .env.example .env                                   # apunta DATABASE_URL a tu Postgres
 alembic upgrade head
 python -m scripts.seed

@@ -5,7 +5,7 @@ from app.core.config import get_settings
 from app.main import create_app
 
 
-@pytest.fixture()
+@pytest.fixture
 def cors_client(monkeypatch):
     monkeypatch.setenv("CORS_ORIGINS", "http://localhost:5173,app://senavoz")
     get_settings.cache_clear()

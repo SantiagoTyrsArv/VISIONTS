@@ -38,7 +38,8 @@ def _slots(hands):
 def test_parity_with_app(case):
     left, right = _slots(case["hands"])
     out = normalize_frame(left, right)
-    assert out.shape == (126,) and out.dtype == np.float32
+    assert out.shape == (126,)
+    assert out.dtype == np.float32
     np.testing.assert_allclose(out, np.array(case["expected"], np.float32), atol=1e-6)
 
 

@@ -119,11 +119,7 @@ export default function Meeting() {
         </p>
       ) : null}
       {paused ? <p className={styles.note}>{t('meeting.paused')}</p> : null}
-      {preparing ? (
-        <p className={styles.note} role="status">
-          {t('meeting.preparing')}
-        </p>
-      ) : null}
+      {preparing ? <output className={styles.note}>{t('meeting.preparing')}</output> : null}
       {failedShortcuts.length ? (
         <p className={styles.note}>
           {t('meeting.shortcutsFailed', { list: failedShortcuts.join(', ') })}

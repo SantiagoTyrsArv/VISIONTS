@@ -30,7 +30,8 @@ def _samples():
 def test_cross_validation_measures_every_sign_with_every_signer():
     cv = cross_validate(_samples(), **FAST)
     assert set(cv.per_label) == {"hello", "bye", "sorry", "neutral"}
-    assert cv.per_label["hello"] >= 0.8 and cv.per_label["bye"] >= 0.8
+    assert cv.per_label["hello"] >= 0.8
+    assert cv.per_label["bye"] >= 0.8
     assert cv.per_label["sorry"] < 0.8
     assert cv.counts["hello"] == 40  # 10 personas × 4: todas validadas una vez
     assert len(cv.best_epochs) == 3

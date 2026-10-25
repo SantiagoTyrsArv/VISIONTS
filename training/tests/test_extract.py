@@ -82,8 +82,11 @@ def test_extract_detects_every_frame_and_keeps_one_in_two(tmp_path):
     seq = extract_video(video, fake)
     assert len(fake.timestamps) == 10
     assert all(a < b for a, b in zip(fake.timestamps, fake.timestamps[1:]))
-    assert seq.shape == (5, 126) and seq.dtype == np.float32
-    assert not seq[:, :63].any() and seq[:, 63:].any()  # Right → posición 1, como en la app
+    assert seq.shape == (5, 126)
+    assert seq.dtype == np.float32
+    # Right → posición 1, como en la app
+    assert not seq[:, :63].any()
+    assert seq[:, 63:].any()
 
 
 def test_extract_holds_a_lost_hand_like_the_app(tmp_path):
@@ -92,7 +95,8 @@ def test_extract_holds_a_lost_hand_like_the_app(tmp_path):
     fake = FakeLandmarker(lambda k: _result(("Left", 0.6)) if k == 0 else _result())
     seq = extract_video(video, fake)
     assert seq.shape == (7, 126)
-    assert (seq[1:4] == seq[0]).all() and seq[0, :63].any()
+    assert (seq[1:4] == seq[0]).all()
+    assert seq[0, :63].any()
     assert not seq[4:].any()
 
 
@@ -120,7 +124,8 @@ def test_extract_all_writes_cache_and_skips_done(tmp_path):
     cache = tmp_path / "cache"
     extract_all(zips, cache, make_landmarker=factory, workers=1)
     out = cache / "Cordialidad" / "Hola" / "1__0.npy"
-    assert out.exists() and (cache / "Cordialidad" / "Hola" / "12__3.npy").exists()
+    assert out.exists()
+    assert (cache / "Cordialidad" / "Hola" / "12__3.npy").exists()
     assert np.load(out).shape == (3, 126)
     assert len(created) == 2
 

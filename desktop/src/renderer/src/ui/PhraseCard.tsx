@@ -11,7 +11,13 @@ type Props = {
   onClick: () => void;
 };
 
-export function PhraseCard({ text, shortcut, active = false, hasSign = false, onClick }: Props) {
+export function PhraseCard({
+  text,
+  shortcut,
+  active = false,
+  hasSign = false,
+  onClick,
+}: Readonly<Props>) {
   return (
     <button
       type="button"

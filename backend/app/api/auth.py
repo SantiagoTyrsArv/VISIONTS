@@ -1,14 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from app.core.config import get_settings
+from app.core.deps import DbSession
 from app.core.rate_limit import (
     clear_login_failures,
     limiter,
     login_allowed,
     record_login_failure,
 )
-from app.db.session import get_db
 from app.schemas.auth import LoginIn, RefreshIn, RegisterIn, TokenPair, UserOut
 from app.services import auth_service
 
@@ -18,7 +17,7 @@ _settings = get_settings()
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 @limiter.limit(_settings.rate_limit_register)
-def register(request: Request, data: RegisterIn, db: Session = Depends(get_db)):
+def register(request: Request, data: RegisterIn, db: DbSession):
     try:
         return auth_service.register(db, data)
     except auth_service.EmailAlreadyRegistered:
@@ -27,7 +26,7 @@ def register(request: Request, data: RegisterIn, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokenPair)
 @limiter.limit(_settings.rate_limit_login)
-def login(request: Request, data: LoginIn, db: Session = Depends(get_db)):
+def login(request: Request, data: LoginIn, db: DbSession):
     rate = _settings.rate_limit_login_account
     if not login_allowed(data.email, rate):
         raise HTTPException(
@@ -45,7 +44,7 @@ def login(request: Request, data: LoginIn, db: Session = Depends(get_db)):
 
 @router.post("/refresh", response_model=TokenPair)
 @limiter.limit(_settings.rate_limit_refresh)
-def refresh(request: Request, data: RefreshIn, db: Session = Depends(get_db)):
+def refresh(request: Request, data: RefreshIn, db: DbSession):
     try:
         return auth_service.refresh(db, data.refresh_token)
     except auth_service.AuthError as e:
@@ -53,6 +52,6 @@ def refresh(request: Request, data: RefreshIn, db: Session = Depends(get_db)):
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(data: RefreshIn, db: Session = Depends(get_db)):
+def logout(data: RefreshIn, db: DbSession):
     auth_service.logout(db, data.refresh_token)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

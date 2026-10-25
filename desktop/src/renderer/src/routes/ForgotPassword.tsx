@@ -35,13 +35,12 @@ export default function ForgotPassword() {
     defaultValues: { email: '' },
   });
 
-  const onSubmit = handleSubmit(async ({ email }) => {
+  const onSubmit = handleSubmit(async () => {
     setServerError(null);
     try {
       // TODO (Fase 2): llamar a POST /auth/forgot-password con { email }
       // Por ahora simulamos un retardo de red para que el flujo de UI sea real.
       await new Promise((r) => setTimeout(r, 800));
-      void email; // el backend recibirá el correo cuando esté implementado
       setSent(true);
     } catch {
       setServerError(t('error.generic'));

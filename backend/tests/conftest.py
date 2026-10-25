@@ -18,7 +18,7 @@ from app.main import app
 from app.services.phrase_service import seed_default_phrases
 
 
-@pytest.fixture()
+@pytest.fixture
 def db_session():
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
@@ -30,20 +30,29 @@ def db_session():
     engine.dispose()
 
 
-@pytest.fixture()
-def client(db_session):
+@pytest.fixture
+def client(db_session, monkeypatch):
     def _get_db():
         yield db_session
 
     app.dependency_overrides[get_db] = _get_db
-    limiter.enabled = False
+    monkeypatch.setattr(limiter, "enabled", False)
     limiter.reset()
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
 
 
-@pytest.fixture()
+@pytest.fixture
+def rate_limited(client, monkeypatch):
+    """Activa los límites de peticiones (desactivados en `client`) con los contadores a cero."""
+    monkeypatch.setattr(limiter, "enabled", True)
+    limiter.reset()
+    yield
+    limiter.reset()
+
+
+@pytest.fixture
 def seeded(db_session):
     seed_default_phrases(db_session)
 
@@ -51,14 +60,14 @@ def seeded(db_session):
 USER = {"email": "Ana@Example.com", "password": "clave1234", "display_name": "Ana"}
 
 
-@pytest.fixture()
+@pytest.fixture
 def registered(client):
     r = client.post("/auth/register", json=USER)
     assert r.status_code == 201
     return USER
 
 
-@pytest.fixture()
+@pytest.fixture
 def tokens(client, registered):
     r = client.post(
         "/auth/login", json={"email": registered["email"], "password": registered["password"]}

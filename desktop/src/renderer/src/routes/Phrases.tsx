@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import type { Phrase } from '@/api/types';
@@ -21,6 +22,33 @@ export default function Phrases() {
   const playing = usePlayback((s) => s.playing);
   const signs = useSignModel(useShallow(signLabels));
   usePhraseShortcuts(data, speak);
+
+  let content: ReactNode;
+  if (isPending) {
+    content = <output className={styles.center}>{t('home.loading')}</output>;
+  } else if (isError) {
+    content = (
+      <div className={styles.center}>
+        <p className={styles.errorText}>{t('home.error')}</p>
+        <Button label={t('home.retry')} loading={isRefetching} onClick={() => void refetch()} />
+      </div>
+    );
+  } else {
+    content = (
+      <div className={styles.grid}>
+        {data.map((p, i) => (
+          <PhraseCard
+            key={p.code}
+            text={p.text_es}
+            shortcut={i < 9 ? i + 1 : undefined}
+            active={p.text_es === lastText}
+            hasSign={signs.includes(p.code)}
+            onClick={() => speak(p)}
+          />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className={styles.page}>
@@ -56,29 +84,7 @@ export default function Phrases() {
         </section>
       ) : null}
 
-      {isPending ? (
-        <div className={styles.center} role="status">
-          {t('home.loading')}
-        </div>
-      ) : isError ? (
-        <div className={styles.center}>
-          <p className={styles.errorText}>{t('home.error')}</p>
-          <Button label={t('home.retry')} loading={isRefetching} onClick={() => void refetch()} />
-        </div>
-      ) : (
-        <div className={styles.grid}>
-          {data.map((p, i) => (
-            <PhraseCard
-              key={p.code}
-              text={p.text_es}
-              shortcut={i < 9 ? i + 1 : undefined}
-              active={p.text_es === lastText}
-              hasSign={signs.includes(p.code)}
-              onClick={() => speak(p)}
-            />
-          ))}
-        </div>
-      )}
+      {content}
     </div>
   );
 }
