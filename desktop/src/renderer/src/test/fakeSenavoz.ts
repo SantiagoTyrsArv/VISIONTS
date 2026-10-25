@@ -14,9 +14,15 @@ export function installFakeSenavoz(options: Options = {}) {
   const shortcutListeners = new Set<(index: number) => void>();
   const api: SenavozApi = {
     tokens: {
-      get: async () => stored,
-      save: async (t) => void (stored = t),
-      clear: async () => void (stored = null),
+      get: () => Promise.resolve(stored),
+      save: (t) => {
+        stored = t;
+        return Promise.resolve();
+      },
+      clear: () => {
+        stored = null;
+        return Promise.resolve();
+      },
     },
     tts: {
       voices: vi.fn(async () => options.voices ?? []),
@@ -32,7 +38,9 @@ export function installFakeSenavoz(options: Options = {}) {
       exit: vi.fn(async () => {}),
       onShortcut: (callback) => {
         shortcutListeners.add(callback);
-        return () => void shortcutListeners.delete(callback);
+        return () => {
+          shortcutListeners.delete(callback);
+        };
       },
     },
   };

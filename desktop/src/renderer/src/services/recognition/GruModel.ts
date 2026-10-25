@@ -68,7 +68,7 @@ export class GruModel implements LandmarkModel {
 
   static fromJson(json: unknown): GruModel {
     const w = json as Partial<GruWeightsJson> | null;
-    if (!w || w.format !== GRU_FORMAT) fail('Formato de modelo desconocido');
+    if (w?.format !== GRU_FORMAT) fail('Formato de modelo desconocido');
     if (w.input_size !== VALUES_PER_FRAME) fail('Tamaño de entrada distinto de 126');
     const h = w.hidden_size;
     if (!Number.isInteger(h) || (h as number) <= 0) fail('hidden_size no válido');

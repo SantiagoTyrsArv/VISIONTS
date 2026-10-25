@@ -7,7 +7,7 @@ import styles from './ui.module.css';
 
 const BARS = [18, 40, 28, 56, 34, 22, 46, 14];
 
-export function AuthScreen({ title, children }: { title: string; children: ReactNode }) {
+export function AuthScreen({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
   return (
     <div className={styles.auth}>
       <section className={styles.authHero}>

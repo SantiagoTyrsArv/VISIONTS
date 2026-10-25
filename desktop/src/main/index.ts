@@ -58,7 +58,9 @@ function registerIpc(win: BrowserWindow) {
       readFile,
       readdir,
       rm: (p) => rm(p, { force: true }),
-      mkdir: async (p) => void (await mkdir(p, { recursive: true })),
+      mkdir: async (p) => {
+        await mkdir(p, { recursive: true });
+      },
     },
   });
   ipcMain.handle(IPC.ttsVoices, () => tts.voices().catch(() => []));

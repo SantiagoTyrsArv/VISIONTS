@@ -28,7 +28,7 @@ export function resolveAppPath(
   if (url.host !== APP_HOST) return { kind: 'notFound' };
 
   // Barras invertidas de Windows y unidades ("C:") tras decodificar: nunca legítimas.
-  const clean = pathname.replace(/\\/g, '/');
+  const clean = pathname.replaceAll('\\', '/');
   if (clean.includes(':') || clean.split('/').includes('..')) return { kind: 'notFound' };
 
   const rootAbs = resolve(root);

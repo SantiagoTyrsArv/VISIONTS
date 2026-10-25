@@ -18,7 +18,7 @@ export function Button({
   disabled,
   variant = 'primary',
   ariaLabel,
-}: Props) {
+}: Readonly<Props>) {
   const cls = [styles.button, variant !== 'primary' && styles[variant]].filter(Boolean).join(' ');
   return (
     <button

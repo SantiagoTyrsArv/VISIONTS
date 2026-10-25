@@ -17,14 +17,15 @@ export function FormField<T extends FieldValues>({
   label,
   type = 'text',
   autoComplete,
-}: Props<T>) {
+}: Readonly<Props<T>>) {
   const id = useId();
   const { field, fieldState } = useController({ control, name });
   const errorId = `${id}-error`;
   const toggleId = `${id}-toggle`;
   const isPassword = type === 'password';
   const [visible, setVisible] = useState(false);
-  const effectiveType = isPassword ? (visible ? 'text' : 'password') : type;
+  const passwordType = visible ? 'text' : 'password';
+  const effectiveType = isPassword ? passwordType : type;
 
   return (
     <div className={styles.field}>

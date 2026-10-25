@@ -81,6 +81,7 @@
 }
 .alert,
 .note {
+  display: block;
   margin: 0;
   padding: 10px 12px;
   border-radius: var(--radius-s);
