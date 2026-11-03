@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -6,8 +6,10 @@ import { usePhrases } from '@/api/usePhrases';
 import { modelStatusText, useSignRecognition, visionMessageKey } from '@/hooks/useSignRecognition';
 import { t } from '@/i18n';
 import { speechService } from '@/services/speech';
+import { useSignDiagnostics } from '@/store/signDiagnostics';
 import { useSignModel } from '@/store/signModel';
 import { Button } from '@/ui/Button';
+import { SignDiagnostics } from '@/ui/SignDiagnostics';
 
 import styles from './routes.module.css';
 
@@ -39,6 +41,14 @@ export default function Camera(): JSX.Element {
   const hands = recognition?.handsDetected ?? false;
   const model = useSignModel(useShallow((s) => ({ status: s.status, labels: s.labels })));
   const modelReady = model.status === 'ready';
+  const phraseNames = useMemo(
+    () => Object.fromEntries((phrases ?? []).map((p) => [p.code, p.text_es])),
+    [phrases],
+  );
+  // Sin manos el reconocedor deja de predecir: la última lectura ya no vale.
+  useEffect(() => {
+    if (!hands) useSignDiagnostics.getState().clear();
+  }, [hands]);
 
   return (
     <div className={styles.page}>
@@ -116,6 +126,8 @@ export default function Camera(): JSX.Element {
               <p className={styles.muted}>{t('camera.recentEmpty')}</p>
             )}
           </section>
+
+          {import.meta.env.DEV ? <SignDiagnostics names={phraseNames} /> : null}
         </aside>
       </div>
     </div>

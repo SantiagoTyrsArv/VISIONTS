@@ -283,3 +283,61 @@
   color: var(--accent-text);
   box-shadow: none;
 }
+
+/* Panel de diagnóstico del reconocimiento (solo en desarrollo). */
+.diagnostics {
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px dashed var(--border-strong);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.diagnosticsTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.diagnosticsList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.diagnosticsRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.diagnosticsTrack {
+  position: relative;
+  display: block;
+  height: 6px;
+  margin-top: 4px;
+  border-radius: 3px;
+  background: var(--surface-raised);
+}
+.diagnosticsBar {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--live);
+}
+.diagnosticsThreshold {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--accent);
+}
+.diagnosticsHint {
+  margin: 0;
+  color: var(--text-muted);
+}

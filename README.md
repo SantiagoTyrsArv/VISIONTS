@@ -109,7 +109,7 @@ npm run build:win           # instalador en desktop/release/SenaVoz-Setup-<versi
 
 1. Regístrate (entras directamente) o inicia sesión. La sesión se mantiene al cerrar y reabrir la app.
 2. **Frases**: haz clic en una tarjeta (o pulsa Enter/Espacio) y se reproduce en voz. **Atajos 1–9** para las nueve primeras frases; no se disparan mientras escribes ni con Ctrl/Alt.
-3. **Cámara**: vista de la webcam en espejo; MediaPipe detecta hasta dos manos y muestra su estado. La app empaqueta el runtime WASM y el modelo de detección, por lo que no necesita descargar esos archivos al iniciarse. Las frases marcadas con **Seña** se reconocen al hacerlas frente a la cámara y se dicen en voz; el panel muestra el estado del modelo y cuántas señas reconoce. Si hay varias webcams aparece un selector; los errores de permiso y cámara mantienen su mensaje específico y opción "Reintentar".
+3. **Cámara**: vista de la webcam en espejo; MediaPipe detecta hasta dos manos y muestra su estado. La app empaqueta el runtime WASM y el modelo de detección, por lo que no necesita descargar esos archivos al iniciarse. Las frases marcadas con **Seña** se reconocen al hacerlas frente a la cámara y se dicen en voz; el panel muestra el estado del modelo y cuántas señas reconoce. En `npm run dev` (no en el instalador) aparece además un panel **Diagnóstico** con la probabilidad de cada clase y el umbral del 80 %, para ver por qué una seña no se reconoce. Si hay varias webcams aparece un selector; los errores de permiso y cámara mantienen su mensaje específico y opción "Reintentar".
 4. **Ajustes**: sección **Reunión** (detección de VB-Cable, salida y prueba por el cable), voz de Windows (voces `es-*` instaladas), volumen, velocidad, cámara preferida (si se desenchufa, se usa la predeterminada), **Créditos** (atribución de LSC-54) y **Cerrar sesión**, que revoca el refresh token en el servidor.
 
 ### Usar SeñaVoz en una reunión
@@ -136,11 +136,18 @@ cd backend && pytest
 cd desktop
 npm test              # Vitest: proyectos main (node) y renderer (jsdom + Testing Library)
 npm run typecheck     # tsc para main/preload y renderer
+npm run lint
+
+# Entrenamiento (ver training/README.md para crear el entorno)
+cd training && .venv\Scripts\python -m pytest
 ```
 
-- **Backend (52 tests):** registro, email duplicado, contraseñas débiles, login correcto e incorrecto (respuestas indistinguibles), rate limit, `/users/me` con y sin token, refresh con rotación, detección de reutilización, refresh expirado, logout, frases, seed idempotente, CORS de los orígenes de escritorio, muestras (validación, tope, aislamiento entre usuarios y borrado), entrenamiento GRU (determinismo, tope de tiempo), cola de entrenamientos, estado y pesos `no-store`, y el worker.
-- **Escritorio, main (46 tests):** almacén de tokens cifrado (incluidos archivo corrupto y cifrado no disponible), resolución de rutas de `app://` (path traversal, también codificado), orígenes y permisos de confianza, y User-Agent ASCII.
-- **Escritorio, renderer (140 tests):** login, guard de rutas, sesión, cliente HTTP, voz, atajos, frases, ajustes, cámara, reunión y reconocimiento (normalización 30×126, clasificación con umbral/cooldown, ciclo de vida de MediaPipe, GRU en TypeScript con paridad frente a PyTorch, modelo en memoria, ráfagas y pantalla Entrenar).
+Recuentos del 3/11/2026 (todos pasan):
+
+- **Backend (30 tests):** registro, email duplicado, contraseñas débiles, login correcto e incorrecto (respuestas indistinguibles), límites por IP y por cuenta, `/users/me` con y sin token, refresh con rotación, detección de reutilización, refresh expirado, logout, frases y seed idempotente, `/samples` y `/models` eliminados (404), CORS de los orígenes de escritorio, `DATABASE_URL` de Neon y Render convertida a psycopg 3, y la migración `0004` sube y baja.
+- **Escritorio, main (46 tests):** almacén de tokens cifrado (incluidos archivo corrupto y cifrado no disponible), resolución de rutas de `app://` (path traversal, también codificado), orígenes y permisos de confianza, User-Agent ASCII y síntesis de voz por PowerShell.
+- **Escritorio, renderer (142 tests):** login, guard de rutas, sesión, cliente HTTP, voz, atajos, frases (distintivo "Seña"), ajustes, cámara, reunión y reconocimiento (normalización con paridad frente a `training/`, ventana temporal por intervalo y mano perdida, clasificación con umbral y pausa, ciclo de vida de MediaPipe, GRU en TypeScript con paridad frente a PyTorch, carga del modelo empaquetado y panel de diagnóstico).
+- **Training (54 tests):** extracción con caché, carga de LSC-54, normalización, clase `neutral`, etiquetas frente al catálogo de frases, validación por persona sin fuga, aumentos, determinismo y exportación de `sign-model.json`.
 
 ## Qué se verificó y qué NO
 
@@ -167,21 +174,30 @@ npm run typecheck     # tsc para main/preload y renderer
   - `docker compose up --build` con `db`, `api` (migración `0002`) y `trainer` sin errores;
   - de extremo a extremo contra Postgres: 60 muestras subidas, `NaN` rechazado con 422, entrenamiento en cola (409 si se repite), modelo listo en unos 5 s, pesos con `Cache-Control: no-store` y borrado total;
   - `npm run build:win`: `app.asar` pasa de 35,4 MB a 22,9 MB al quitar el WASM sin SIMD.
+  - Este flujo (pantalla Entrenar, `/samples`, `/models` y `trainer`) se eliminó el 14/10/2026 al pasar al modelo global.
+
+- Revisión del 23/10/2026 (modelo global y despliegue): la app instalada se registra, inicia sesión y dice frases contra la API de Render (ver [Despliegue](#despliegue)).
+
+- Prueba manual del 3/11/2026 (`npm run dev` contra Docker local, webcam real, con el panel Diagnóstico): la app reconoce **"Buenos días"** y **"Buenas tardes"** hechas por una persona frente a la cámara, en la pantalla Cámara y en **Modo reunión** (la frase llega a la reunión). Es la primera prueba con una persona que no está en LSC-54. No hubo falsos positivos: con las manos quietas o bajadas no se dijo nada.
 
 **No verificado:**
 
-- Grabar señas reales con una webcam física en la pantalla Entrenar y que Cámara y Modo reunión digan la frase con el modelo resultante (el flujo está cubierto por tests y por la prueba de extremo a extremo de la API con datos sintéticos).
+- La tasa de acierto con webcam real. Quien probó no sabe LSC, así que cuando una seña no se reconoció no se sabe si falló el modelo o la seña estaba mal hecha. Para medirla hace falta una persona que signe LSC, con otras cámaras e iluminación. Con vídeos de LSC-54 de personas no vistas, el acierto es 0,86 en "Buenos días" y 0,81 en "Buenas tardes".
 - Que el audio **se oiga** bien: se comprobó que la síntesis se activa, no la calidad del sonido.
 - La ejecución del instalador NSIS (asistente, accesos directos y desinstalación).
 - macOS y Linux, firma de código y auto-update (fuera de alcance).
 
 ## Decisiones de dependencias
 
-- **Electron + electron-vite + React/TypeScript**: reutiliza la lógica TS del MVP móvil (cliente con refresh, stores, i18n). `@mediapipe/tasks-vision` corre en el renderer sin código nativo; detección de manos local y clasificación con la GRU de cada usuario ejecutada en TypeScript puro. La voz se genera con las voces OneCore de Windows (WinRT vía PowerShell) y se envía con `setSinkId`.
+- **Electron + electron-vite + React/TypeScript**: reutiliza la lógica TS del MVP móvil (cliente con refresh, stores, i18n). `@mediapipe/tasks-vision` corre en el renderer sin código nativo; detección de manos local y clasificación con una GRU global (entrenada en `training/`) ejecutada en TypeScript puro, sin runtimes de ML. La voz se genera con las voces OneCore de Windows (WinRT vía PowerShell) y se envía con `setSinkId`.
 - **Vite 7** (no 8) y **TypeScript 5.9**: son las versiones que admite electron-vite 5 y su tsconfig base.
 - **react-router** con `HashRouter` (funciona igual bajo `app://` y en desarrollo), **Zustand**, **TanStack Query**, **react-hook-form + zod 4**.
 - **Vitest** con dos proyectos (main en Node y renderer en jsdom). La lógica del main se escribe con dependencias inyectadas para testearla sin Electron.
-- **Web Speech API** para la voz (voces del sistema). No permite elegir el dispositivo de salida, así que enviar la voz a la reunión requerirá audio pregenerado + `setSinkId` (Fase 4).
+- **Web Speech API** solo como respaldo fuera del Modo reunión, porque no permite elegir el dispositivo de salida. La voz normal es audio pregenerado con OneCore y reproducido con `setSinkId`.
+
+## Datos y licencia
+
+El modelo de señas se entrena con **LSC-54**: Mora-Zarate, Garzón-Castro y Castellanos-Rivillas, *LSC-54: A landmark-based dataset for Colombian Sign Language*, Data in Brief 63 (2025) 112145. Dataset: <https://doi.org/10.57760/sciencedb.25639>, licencia **CC BY-NC 4.0** (uso no comercial, con atribución). El dataset no se versiona; la atribución también aparece en Ajustes › Créditos. Cómo descargarlo y entrenar: [training/README.md](training/README.md).
 - Las dependencias del renderer son `devDependencies`: Vite las empaqueta, así que no entran en el `app.asar`.
 - El **User-Agent se normaliza a ASCII** ("SenaVoz"), porque con la ñ del nombre Chromium rechazaba las subpeticiones de `app://` y la app empaquetada se quedaba en blanco.
 - Textos de UI centralizados en `desktop/src/renderer/src/i18n` (solo `es`).
