@@ -17,6 +17,8 @@ export type ClassifierOptions = {
 };
 
 const EXPECTED_SEQUENCE_VALUES = 30 * 126;
+/** Confianza mínima para decir una frase. */
+export const DEFAULT_THRESHOLD = 0.8;
 
 /** Creates a label-to-catalog adapter; no classifier exists until trained weights are supplied. */
 export function createSignClassifier(
@@ -26,7 +28,7 @@ export function createSignClassifier(
 ): SignClassifier | null {
   if (!model) return null;
 
-  const threshold = options.threshold ?? 0.8;
+  const threshold = options.threshold ?? DEFAULT_THRESHOLD;
   const cooldownMs = options.cooldownMs ?? 1200;
   const clock = options.clock ?? Date.now;
   const lastEmitted = new Map<string, number>();

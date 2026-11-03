@@ -1,8 +1,11 @@
 import { create } from 'zustand';
 
 import { GruModel } from '@/services/recognition/GruModel';
+import { withDiagnostics } from '@/services/recognition/diagnostics';
 import { createSignClassifier, type SignClassifier } from '@/services/recognition/SignClassifier';
 import { FRAME_INTERVAL_MS, SEQUENCE_LENGTH } from '@/services/recognition/landmarks';
+
+import { useSignDiagnostics } from './signDiagnostics';
 
 const NEUTRAL = 'neutral';
 // Una seña puede seguir dentro de la ventana (≈ 2 s) tras reconocerse: no se repite antes.
@@ -45,9 +48,13 @@ export const useSignModel = create<SignModelState>()((set) => ({
         model.labels.filter((l) => l !== NEUTRAL).map((l) => [l, l]),
       );
       const acc = (json as { metrics?: { val_accuracy?: unknown } }).metrics?.val_accuracy;
+      // En desarrollo, cada predicción publica todas las probabilidades (panel Diagnóstico).
+      const observed = import.meta.env.DEV
+        ? withDiagnostics(model, (p) => useSignDiagnostics.getState().update(p))
+        : model;
       set({
         status: 'ready',
-        classifier: createSignClassifier(model, labelToCode, { cooldownMs: COOLDOWN_MS }),
+        classifier: createSignClassifier(observed, labelToCode, { cooldownMs: COOLDOWN_MS }),
         labels: [...model.labels],
         valAccuracy: typeof acc === 'number' ? acc : null,
       });

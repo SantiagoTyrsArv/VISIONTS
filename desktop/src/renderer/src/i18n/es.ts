@@ -90,6 +90,13 @@ export const es = {
   'camera.recentTitle': 'Últimas señas',
   'camera.recentEmpty': 'Aquí aparecerán las frases reconocidas.',
 
+  'diagnostics.title': 'Diagnóstico (solo desarrollo)',
+  'diagnostics.neutral': 'Sin seña (neutral)',
+  'diagnostics.idle': 'Sin manos en la ventana: el modelo no se ejecuta.',
+  'diagnostics.verdictNeutral': 'El modelo no ve ninguna seña.',
+  'diagnostics.verdictAbove': 'La seña más probable supera el umbral: se dice la frase.',
+  'diagnostics.verdictBelow': 'La seña más probable está bajo el umbral ({threshold}): no se dice.',
+
   'settings.title': 'Ajustes',
   'settings.profile': 'Perfil',
   'settings.voice': 'Voz',
