@@ -35,7 +35,7 @@ const frameScheduler: FrameScheduler = {
 };
 
 // Solo se empaqueta el WASM con SIMD: cualquier PC con Windows 10/11 x64 lo admite.
-async function createDefaultLandmarker(): Promise<Landmarker> {
+function createDefaultLandmarker(): Promise<Landmarker> {
   const modelAssetPath = new URL('/models/hand_landmarker.task', window.location.href).toString();
   return HandLandmarker.createFromOptions(
     { wasmLoaderPath: simdLoaderUrl, wasmBinaryPath: simdWasmUrl },

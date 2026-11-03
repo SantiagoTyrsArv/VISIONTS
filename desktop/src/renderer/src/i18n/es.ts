@@ -5,24 +5,15 @@ export const es = {
   'app.loading': 'Cargando…',
 
   'auth.email': 'Correo electrónico',
-  'auth.password': 'Contraseña',
+  'auth.password': 'Contraseña', // NOSONAR: es la etiqueta del campo, no una contraseña
   'auth.confirmPassword': 'Confirmar contraseña',
   'auth.displayName': 'Nombre',
   'auth.login.title': 'Iniciar sesión',
   'auth.login.submit': 'Entrar',
   'auth.login.toRegister': '¿No tienes cuenta? Regístrate',
-  'auth.login.forgotPassword': '¿Olvidaste tu contraseña?',
   'auth.register.title': 'Crear cuenta',
   'auth.register.submit': 'Registrarme',
   'auth.register.toLogin': '¿Ya tienes cuenta? Inicia sesión',
-  'auth.forgot.title': 'Recuperar contraseña',
-  'auth.forgot.hint':
-    'Escribe tu correo y te enviaremos instrucciones para restablecer tu contraseña.',
-  'auth.forgot.submit': 'Enviar instrucciones',
-  'auth.forgot.sentTitle': 'Revisa tu correo',
-  'auth.forgot.sentBody':
-    'Si hay una cuenta asociada a este correo, recibirás un enlace para restablecer tu contraseña en:',
-  'auth.forgot.backToLogin': 'Volver al inicio de sesión',
   'auth.loading': 'Un momento…',
   'auth.claim': 'Tus señas, con voz en cualquier reunión.',
   'auth.claimSub': 'Funciona con Zoom, Teams, Google Meet y cualquier app que use un micrófono.',

@@ -51,9 +51,10 @@ def test_same_seed_same_result():
 
 
 def test_time_budget():
+    samples = _synthetic()
     ticks = iter(range(0, 10_000, 100))
     with pytest.raises(TrainingTimeout):
-        train_model(_synthetic(), hidden_size=8, time_budget_s=150, clock=lambda: next(ticks))
+        train_model(samples, hidden_size=8, time_budget_s=150, clock=lambda: next(ticks))
 
 
 def test_needs_two_labels():

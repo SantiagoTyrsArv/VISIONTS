@@ -25,17 +25,17 @@ export function installFakeSenavoz(options: Options = {}) {
       },
     },
     tts: {
-      voices: vi.fn(async () => options.voices ?? []),
+      voices: vi.fn(() => Promise.resolve(options.voices ?? [])),
       synthesize: vi.fn(
         options.synthesize ??
-          (async (items: SynthItem[]) =>
-            items.map(() => ({ ok: true as const, wav: new ArrayBuffer(8) }))),
+          ((items: SynthItem[]) =>
+            Promise.resolve(items.map(() => ({ ok: true as const, wav: new ArrayBuffer(8) })))),
       ),
-      prune: vi.fn(async () => {}),
+      prune: vi.fn(() => Promise.resolve()),
     },
     meeting: {
-      enter: vi.fn(async () => ({ failedShortcuts: options.failedShortcuts ?? [] })),
-      exit: vi.fn(async () => {}),
+      enter: vi.fn(() => Promise.resolve({ failedShortcuts: options.failedShortcuts ?? [] })),
+      exit: vi.fn(() => Promise.resolve()),
       onShortcut: (callback) => {
         shortcutListeners.add(callback);
         return () => {

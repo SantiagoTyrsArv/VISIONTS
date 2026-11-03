@@ -5,7 +5,6 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router';
 import { queryClient } from '@/api/queryClient';
 import { AppLayout } from '@/routes/AppLayout';
 import Camera from '@/routes/Camera';
-import ForgotPassword from '@/routes/ForgotPassword';
 import { RequireAuth, RequireGuest } from '@/routes/Guard';
 import Login from '@/routes/Login';
 import Meeting from '@/routes/Meeting';
@@ -26,7 +25,6 @@ export function App() {
           <Route element={<RequireGuest />}>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
           </Route>
           <Route element={<RequireAuth />}>
             <Route element={<AppLayout />}>

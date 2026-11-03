@@ -24,12 +24,13 @@ senavoz/
 ## Backend
 
 ```bash
+cp .env.example .env        # rellena POSTGRES_PASSWORD y JWT_SECRET
 docker compose up --build
 ```
 
 Levanta `db` (Postgres 17) y `api`. Al arrancar, el contenedor ejecuta `alembic upgrade head` y el seed idempotente de frases. La API queda en <http://localhost:8000>, con documentación interactiva en `/docs`.
 
-> Las credenciales de BD y el `JWT_SECRET` por defecto de `docker-compose.yml` son **solo para desarrollo**. Para cualquier otro entorno defínelos (`POSTGRES_PASSWORD`, `JWT_SECRET`) en un `.env` junto al compose. El secreto JWT debe tener ≥ 32 caracteres.
+> `docker-compose.yml` no trae contraseñas: sin `POSTGRES_PASSWORD` y `JWT_SECRET` en el `.env` de la raíz, `docker compose` se niega a arrancar. El secreto JWT debe tener ≥ 32 caracteres. Postgres solo aplica la contraseña al crear el volumen `pgdata`: si ya lo tenías de antes (contraseña `senavoz`), pon esa en `.env` o bórralo con `docker compose down -v` (se pierden los datos locales).
 
 ### Sin Docker
 
