@@ -9,8 +9,17 @@ export class WebSpeechService implements SpeechService {
     private readonly synth: SpeechSynthesis = window.speechSynthesis,
   ) {}
 
-  async speak(target: SpeakablePhrase | string): Promise<void> {
-    const text = typeof target === 'string' ? target : target.text;
+  // Sin async (no espera nada), pero un fallo sigue llegando como promesa rechazada.
+  speak(target: SpeakablePhrase | string): Promise<void> {
+    try {
+      this.say(typeof target === 'string' ? target : target.text);
+      return Promise.resolve();
+    } catch (error) {
+      return Promise.reject(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  private say(text: string): void {
     const { volume, rate, voiceURI } = this.getOptions();
     // Cancela lo que esté sonando para que clics rápidos no se encolen.
     this.synth.cancel();

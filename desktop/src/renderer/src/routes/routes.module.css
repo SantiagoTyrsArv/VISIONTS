@@ -18,44 +18,8 @@
   padding: 12px;
   text-decoration: none;
 }
-.link:hover,
-.linkSmall:hover {
+.link:hover {
   text-decoration: underline;
-}
-.linkSmall {
-  align-self: flex-end;
-  color: var(--accent);
-  font-size: 14px;
-  padding: 4px 0;
-  text-decoration: none;
-}
-.forgotHint,
-.sentText {
-  color: var(--text-muted);
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.5;
-}
-.sentText {
-  text-align: center;
-}
-.sentBox {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0 16px;
-}
-.sentIcon {
-  width: 48px;
-  height: 48px;
-  color: var(--live);
-}
-.sentEmail {
-  font-weight: 700;
-  text-align: center;
-  margin: 0;
-  word-break: break-all;
 }
 
 /* ---------- Estructura de la app ---------- */
@@ -639,6 +603,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .navLink {
+    transition: none;
+  }
   .barsLive span {
     animation: none;
     height: 20px;

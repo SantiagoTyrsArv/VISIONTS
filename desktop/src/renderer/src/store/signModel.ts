@@ -23,9 +23,9 @@ type SignModelState = {
 // existe en un clon recién hecho: con glob su ausencia no rompe typecheck, tests ni `npm run dev`
 // (la app queda en "no disponible"); `build:win` sí lo exige (scripts/check-sign-model.mjs).
 const modelChunks = import.meta.glob<unknown>('../assets/sign-model.json', { import: 'default' });
-const bundledModel = async (): Promise<unknown> => {
+const bundledModel = (): Promise<unknown> => {
   const chunk = Object.values(modelChunks)[0];
-  if (!chunk) throw new Error('sign-model.json no está en la app');
+  if (!chunk) return Promise.reject(new Error('sign-model.json no está en la app'));
   return chunk();
 };
 

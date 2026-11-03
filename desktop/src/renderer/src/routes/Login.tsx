@@ -52,9 +52,6 @@ export default function Login() {
           type="password"
           autoComplete="current-password"
         />
-        <Link to="/forgot-password" className={styles.linkSmall}>
-          {t('auth.login.forgotPassword')}
-        </Link>
         {serverError ? (
           <p role="alert" className={styles.error}>
             {serverError}
