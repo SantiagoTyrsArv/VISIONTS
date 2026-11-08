@@ -1,0 +1,50 @@
+/* Mano que signa de la pantalla de carga. En reposo queda quieta (sin giro, ondas a
+   opacidad completa); la animación solo se activa si el sistema no pide reducir movimiento. */
+.hand {
+  display: block;
+  width: 300px;
+  max-width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.sway {
+  transform-box: view-box;
+  transform-origin: 51px 104px;
+}
+.outer {
+  stroke: var(--text);
+}
+.inner {
+  stroke: var(--bg);
+}
+.wave {
+  stroke: var(--accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sway {
+    animation: swing 5s ease-in-out infinite;
+  }
+  .wave {
+    animation: pulse 2.4s ease-in-out infinite backwards;
+  }
+}
+
+@keyframes swing {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+}
