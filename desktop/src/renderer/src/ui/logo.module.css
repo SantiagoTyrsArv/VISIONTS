@@ -1,4 +1,5 @@
-/* Logo de la mano: la animación es solo CSS y se detiene con reducir movimiento. */
+/* Logo de la mano: en reposo queda quieto (mano a 0°, ondas a opacidad completa).
+   La animación es solo CSS y solo se activa si el sistema no pide reducir movimiento. */
 .logo {
   display: block;
   flex: none;
@@ -9,27 +10,31 @@
 .hand {
   transform-box: view-box;
   transform-origin: 51px 104px;
-  animation: sway 4.8s ease-in-out infinite;
 }
 .wave {
   stroke: var(--accent);
-  animation: pulse 2.4s ease-in-out infinite;
-}
-.onAccent .wave {
-  stroke: var(--accent-text);
 }
 .onAccent {
   color: var(--accent-text);
 }
-
-/* Un solo saludo: un ciclo de cada y las ondas terminan a opacidad completa. */
-.once .hand {
-  animation-iteration-count: 1;
+.onAccent .wave {
+  stroke: var(--accent-text);
 }
-.once .wave {
-  animation-name: pulseOnce;
-  animation-iteration-count: 1;
-  animation-fill-mode: forwards;
+
+@media (prefers-reduced-motion: no-preference) {
+  .hand {
+    animation: sway 4.8s ease-in-out infinite;
+  }
+  .wave {
+    animation: pulse 2.4s ease-in-out infinite backwards;
+  }
+  /* Un solo saludo: parte y acaba en reposo; las ondas terminan a opacidad 1. */
+  .once .hand {
+    animation: swayOnce 4.8s ease-in-out 1;
+  }
+  .once .wave {
+    animation: pulseOnce 2.4s ease-in-out 1 both;
+  }
 }
 
 @keyframes sway {
@@ -38,6 +43,18 @@
     transform: rotate(-5deg);
   }
   50% {
+    transform: rotate(5deg);
+  }
+}
+@keyframes swayOnce {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-5deg);
+  }
+  75% {
     transform: rotate(5deg);
   }
 }
@@ -54,18 +71,8 @@
   0% {
     opacity: 0.2;
   }
-  50% {
-    opacity: 1;
-  }
+  50%,
   100% {
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hand,
-  .wave {
-    animation: none;
     opacity: 1;
   }
 }
