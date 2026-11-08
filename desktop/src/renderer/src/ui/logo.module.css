@@ -1,0 +1,71 @@
+/* Logo de la mano: la animación es solo CSS y se detiene con reducir movimiento. */
+.logo {
+  display: block;
+  flex: none;
+  color: inherit;
+  stroke: currentColor;
+  overflow: visible;
+}
+.hand {
+  transform-box: view-box;
+  transform-origin: 51px 104px;
+  animation: sway 4.8s ease-in-out infinite;
+}
+.wave {
+  stroke: var(--accent);
+  animation: pulse 2.4s ease-in-out infinite;
+}
+.onAccent .wave {
+  stroke: var(--accent-text);
+}
+.onAccent {
+  color: var(--accent-text);
+}
+
+/* Un solo saludo: un ciclo de cada y las ondas terminan a opacidad completa. */
+.once .hand {
+  animation-iteration-count: 1;
+}
+.once .wave {
+  animation-name: pulseOnce;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+
+@keyframes sway {
+  0%,
+  100% {
+    transform: rotate(-5deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes pulseOnce {
+  0% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hand,
+  .wave {
+    animation: none;
+    opacity: 1;
+  }
+}

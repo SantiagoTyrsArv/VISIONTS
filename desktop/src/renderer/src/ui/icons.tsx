@@ -48,12 +48,6 @@ export const IconMeeting = (p: Props) => (
     <path d="M8 21h8M12 17v4" />
   </Svg>
 );
-/** Logotipo: barras de una onda de voz. */
-export const IconWave = (p: Props) => (
-  <Svg {...p}>
-    <path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2" />
-  </Svg>
-);
 export const IconCheck = (p: Props) => (
   <Svg {...p}>
     <path d="M5 12l5 5 9-10" />

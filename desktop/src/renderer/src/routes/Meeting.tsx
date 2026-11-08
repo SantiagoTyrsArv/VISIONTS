@@ -16,7 +16,8 @@ import { useMeeting } from '@/store/meeting';
 import { usePlayback } from '@/store/playback';
 import { useSettings } from '@/store/settings';
 import { useSignModel } from '@/store/signModel';
-import { IconExpand, IconWave } from '@/ui/icons';
+import { IconExpand } from '@/ui/icons';
+import { Logo } from '@/ui/Logo';
 
 import styles from './meeting.module.css';
 
@@ -80,7 +81,7 @@ export default function Meeting() {
       <header className={styles.header}>
         <div className={styles.headerInfo}>
           <span className={styles.mark} aria-hidden>
-            <IconWave size={16} />
+            <Logo size={16} mode="once" tone="onAccent" />
           </span>
           <div>
             <p className={styles.live}>

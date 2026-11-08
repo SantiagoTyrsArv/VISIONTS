@@ -1,15 +1,16 @@
 import { t } from '@/i18n';
 
-import { IconWave } from './icons';
+import { Logo } from './Logo';
 import styles from './ui.module.css';
 
-/** Marca: placa ámbar con la onda de voz y el nombre. `inverted` para fondos ámbar. */
-export function Brand({ inverted = false }: Readonly<{ inverted?: boolean }>) {
+/** Marca: logo de la mano y el nombre. `inverted` para fondos ámbar. */
+export function Brand({
+  inverted = false,
+  logoMode = 'once',
+}: Readonly<{ inverted?: boolean; logoMode?: 'continuous' | 'once' }>) {
   return (
-    <p className={inverted ? `${styles.brand} ${styles.brandInverted}` : styles.brand}>
-      <span className={styles.brandMark}>
-        <IconWave size={22} />
-      </span>
+    <p className={styles.brand}>
+      <Logo size={40} mode={logoMode} tone={inverted ? 'onAccent' : 'default'} />
       {t('app.name')}
     </p>
   );
