@@ -67,7 +67,7 @@
   gap: 12px;
   padding: 10px;
   border-radius: 12px;
-  background: #1b1f25;
+  background: var(--surface);
   border: 1px solid var(--border);
 }
 .thumb {
@@ -141,7 +141,7 @@
   padding: 8px 10px;
   border-radius: var(--radius-s);
   border: 2px solid var(--border);
-  background: #1b1f25;
+  background: var(--surface);
   color: var(--text);
   display: flex;
   flex-direction: column;
@@ -195,7 +195,7 @@
 .solid {
   border: 0;
   background: var(--text);
-  color: #111315;
+  color: var(--bg);
 }
 @media (prefers-reduced-motion: reduce) {
   .saidPlaying {

@@ -1,27 +1,27 @@
 :root {
-  /* Grafito: no deslumbra junto a Zoom o Teams. Ámbar solo para lo que habla;
-     azul solo para estados activo/detectado (se distinguen también por luminosidad). */
-  --bg: #0f1114;
-  --surface: #181b20;
-  --surface-side: #14171b;
-  --surface-raised: #22262d;
-  --border: #262a31;
-  --border-strong: #3a404b;
-  --text: #f2f0ea;
-  --text-muted: #a3a8b3;
-  --text-nav: #b4b9c3;
+  /* Noche cálida: no deslumbra junto a Zoom o Teams. Ámbar solo para lo que habla;
+     menta solo para estados activo/detectado (se distinguen también por luminosidad). */
+  --bg: #121320;
+  --surface: #1A1C2B;
+  --surface-side: #161826;
+  --surface-raised: #24273A;
+  --border: #2E3147;
+  --border-strong: #3D4160;
+  --text: #F5F2EA;
+  --text-muted: #ADB0C4;
+  --text-nav: #C3C5D6;
   --accent: #ffb547;
   --accent-press: #f0a52f;
-  --accent-text: #1a1206;
-  --accent-soft: #2a2418;
-  --live: #7ab8ff;
-  --live-soft: #1c2a3d;
-  --live-text: #a9d0ff;
-  --warn-bg: #221d14;
-  --warn-border: #4a3b1f;
+  --accent-text: #1E1405;
+  --accent-soft: #2B2620;
+  --live: #6EDCC0;
+  --live-soft: #183A35;
+  --live-text: #9FEBD6;
+  --warn-bg: #24201A;
+  --warn-border: #4D3F26;
   --warn-text: #d9cdb6;
   --danger: #ffa597;
-  --danger-border: #6b3b36;
+  --danger-border: #6E3F45;
   --danger-bg: rgba(255, 165, 151, 0.12);
 
   --radius-s: 10px;
@@ -67,4 +67,15 @@ select {
 ::selection {
   background: var(--accent);
   color: var(--accent-text);
+}
+
+/* Con «reducir movimiento» activado en Windows, todo queda quieto. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
 }
