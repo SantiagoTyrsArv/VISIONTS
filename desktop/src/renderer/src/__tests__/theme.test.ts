@@ -57,6 +57,11 @@ describe('microanimaciones de los componentes', () => {
     expect(rule(source.replace(block, ''), selector)).not.toMatch(/transform:/);
   });
 
+  it('con movimiento reducido, «Entrar en reunión» también responde al hover', () => {
+    const block = /@media \(prefers-reduced-motion: no-preference\) \{([\s\S]*?)\n\}/g;
+    expect(rule(routes.replace(block, ''), '.meetingBtn:hover')).toMatch(/background:/);
+  });
+
   it('al pulsar, tarjeta y botón vuelven a su sitio', () => {
     expect(rule(ui, '.card:active')).toMatch(/transform:\s*none/);
     expect(rule(ui, '.button:active:not(:disabled)')).toMatch(/transform:\s*none/);
