@@ -65,7 +65,7 @@ function renderMeeting() {
       <MemoryRouter initialEntries={['/reunion']}>
         <Routes>
           <Route path="/reunion" element={<Meeting />} />
-          <Route path="/frases" element={<p>pantalla frases</p>} />
+          <Route path="/camara" element={<p>pantalla camara</p>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -131,7 +131,7 @@ describe('pantalla de Modo reunión', () => {
     renderMeeting();
     await userEvent.click(await screen.findByRole('button', { name: 'Salir del modo' }));
     expect(fake.api.meeting.exit).toHaveBeenCalled();
-    expect(await screen.findByText('pantalla frases')).toBeInTheDocument();
+    expect(await screen.findByText('pantalla camara')).toBeInTheDocument();
     expect(useMeeting.getState().active).toBe(false);
   });
 });

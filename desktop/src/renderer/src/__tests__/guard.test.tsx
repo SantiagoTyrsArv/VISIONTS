@@ -13,7 +13,7 @@ function renderAt(path: string) {
           <Route path="/login" element={<p>login</p>} />
         </Route>
         <Route element={<RequireAuth />}>
-          <Route path="/frases" element={<p>frases</p>} />
+          <Route path="/camara" element={<p>camara</p>} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -24,20 +24,20 @@ beforeEach(() => useSession.setState({ status: 'loading', user: null }));
 
 describe('guard de rutas', () => {
   it('mientras carga no pinta ni login ni la ruta', () => {
-    renderAt('/frases');
+    renderAt('/camara');
     expect(screen.queryByText('login')).not.toBeInTheDocument();
-    expect(screen.queryByText('frases')).not.toBeInTheDocument();
+    expect(screen.queryByText('camara')).not.toBeInTheDocument();
   });
 
   it('sin sesión redirige a login', () => {
     useSession.setState({ status: 'unauthenticated' });
-    renderAt('/frases');
+    renderAt('/camara');
     expect(screen.getByText('login')).toBeInTheDocument();
   });
 
-  it('con sesión, login redirige a frases', () => {
+  it('con sesión, login redirige a camara', () => {
     useSession.setState({ status: 'authenticated' });
     renderAt('/login');
-    expect(screen.getByText('frases')).toBeInTheDocument();
+    expect(screen.getByText('camara')).toBeInTheDocument();
   });
 });

@@ -74,7 +74,7 @@ export default function Meeting() {
     togglePause();
   }, [togglePause]);
 
-  if (!active) return <Navigate to="/frases" replace />;
+  if (!active) return <Navigate to="/camara" replace />;
 
   return (
     <main className={styles.meeting}>

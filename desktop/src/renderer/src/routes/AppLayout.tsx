@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from 'react-router';
+import { AnimatePresence } from 'motion/react';
+import { NavLink, useLocation, useOutlet } from 'react-router';
 
 import { useMeetingMode } from '@/hooks/useMeetingMode';
 import { useOutputDevices } from '@/hooks/useOutputDevices';
@@ -7,18 +8,21 @@ import { t } from '@/i18n';
 import { resolveMeetingOutput } from '@/services/audio/outputDevice';
 import { useSettings } from '@/store/settings';
 import { Brand } from '@/ui/Brand';
-import { IconCamera, IconMeeting, IconPhrases, IconSettings } from '@/ui/icons';
+import { IconHand, IconMeeting, IconPhrases, IconSettings } from '@/ui/icons';
+import { PageTransition } from '@/ui/motion/PageTransition';
 
 import styles from './routes.module.css';
 
 const links = [
+  { to: '/camara', label: 'nav.camera', Icon: IconHand },
   { to: '/frases', label: 'nav.home', Icon: IconPhrases },
-  { to: '/camara', label: 'nav.camera', Icon: IconCamera },
   { to: '/ajustes', label: 'nav.settings', Icon: IconSettings },
 ] as const;
 
 export function AppLayout() {
   useVoicePreload();
+  const location = useLocation();
+  const outlet = useOutlet();
   const { enter } = useMeetingMode();
   const { devices } = useOutputDevices();
   const meetingOutput = useSettings((s) => s.meetingOutput);
@@ -27,7 +31,7 @@ export function AppLayout() {
   return (
     <div className={styles.shell}>
       <nav className={styles.sidebar} aria-label={t('nav.label')}>
-        <Brand />
+        <Brand logoMode="once" />
         <div className={styles.navList}>
           {links.map(({ to, label, Icon }) => (
             <NavLink key={to} to={to} className={styles.navLink}>
@@ -48,7 +52,9 @@ export function AppLayout() {
         </div>
       </nav>
       <main className={styles.content}>
-        <Outlet />
+        <AnimatePresence mode="wait" initial={false}>
+          <PageTransition key={location.pathname}>{outlet}</PageTransition>
+        </AnimatePresence>
       </main>
     </div>
   );

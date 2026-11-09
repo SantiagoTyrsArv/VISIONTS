@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 
+import { CONTORNO_MANO, INTERIOR_MANO } from './logoPaths';
+
 type Props = { size?: number };
 
 function Svg({ size = 20, children }: Props & { children: ReactNode }) {
@@ -27,12 +29,6 @@ export const IconPhrases = (p: Props) => (
     <rect x="14" y="3" width="7" height="7" rx="1.5" />
     <rect x="3" y="14" width="7" height="7" rx="1.5" />
     <rect x="14" y="14" width="7" height="7" rx="1.5" />
-  </Svg>
-);
-export const IconCamera = (p: Props) => (
-  <Svg {...p}>
-    <path d="M15 10l5-3v10l-5-3" />
-    <rect x="3" y="6" width="12" height="12" rx="2" />
   </Svg>
 );
 export const IconSettings = (p: Props) => (
@@ -67,5 +63,14 @@ export const IconSpeaker = (p: Props) => (
   <Svg {...p}>
     <path d="M11 5L6 9H3v6h3l5 4z" />
     <path d="M15.5 8.5a5 5 0 010 7" />
+  </Svg>
+);
+/** La mano del logo (sin ondas), escalada del lienzo de 120 al de 24. */
+export const IconHand = (p: Props) => (
+  <Svg {...p}>
+    <g transform="translate(1.8 1.2) scale(0.2)" strokeWidth={10}>
+      <path d={CONTORNO_MANO} />
+      <path d={INTERIOR_MANO} />
+    </g>
   </Svg>
 );

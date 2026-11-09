@@ -40,7 +40,7 @@ export const es = {
 
   'nav.label': 'Navegación principal',
   'nav.home': 'Frases',
-  'nav.camera': 'Cámara',
+  'nav.camera': 'Señas',
   'nav.settings': 'Ajustes',
 
   'home.title': 'Frases rápidas',

@@ -11,5 +11,5 @@ export function RequireAuth() {
 export function RequireGuest() {
   const status = useSession((s) => s.status);
   if (status === 'loading') return null;
-  return status === 'authenticated' ? <Navigate to="/frases" replace /> : <Outlet />;
+  return status === 'authenticated' ? <Navigate to="/camara" replace /> : <Outlet />;
 }

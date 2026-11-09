@@ -23,7 +23,7 @@ export function useMeetingMode() {
     async exit() {
       await window.senavoz.meeting.exit();
       useMeeting.getState().stop();
-      navigate('/frases');
+      navigate('/camara');
     },
   };
 }
