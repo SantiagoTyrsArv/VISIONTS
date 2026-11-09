@@ -4,6 +4,12 @@ export const es = {
   'app.name': 'SeñaVoz',
   'app.loading': 'Cargando…',
 
+  'loading.title': 'Cargando SeñaVoz',
+  'loading.session': 'Comprobando tu sesión',
+  'loading.model': 'Cargando el modelo de señas',
+  'loading.phrases': 'Cargando tus frases',
+  'loading.privacy': 'Todo se procesa en este equipo. Tu cámara no sale de aquí.',
+
   'auth.email': 'Correo electrónico',
   'auth.password': 'Contraseña', // NOSONAR: es la etiqueta del campo, no una contraseña
   'auth.confirmPassword': 'Confirmar contraseña',
