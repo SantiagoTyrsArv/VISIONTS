@@ -1,3 +1,4 @@
+import { motion } from 'motion/react';
 import { useEffect, useId, useState } from 'react';
 
 import { queryClient } from '@/api/queryClient';
@@ -6,6 +7,7 @@ import { listCameras } from '@/services/camera/camera';
 import { useSession } from '@/store/session';
 import { useSettings } from '@/store/settings';
 import { Button } from '@/ui/Button';
+import { useEnter } from '@/ui/motion/useEnter';
 
 import styles from './routes.module.css';
 import { MeetingSection } from './settings/MeetingSection';
@@ -19,6 +21,7 @@ export default function Settings() {
   const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
   const [loggingOut, setLoggingOut] = useState(false);
   const cameraSelectId = useId();
+  const enter = useEnter();
 
   useEffect(() => {
     listCameras().then(setCameras, () => setCameras([]));
@@ -34,11 +37,15 @@ export default function Settings() {
     <div className={`${styles.page} ${styles.settingsPage}`}>
       <h1 className={styles.title}>{t('settings.title')}</h1>
 
-      <MeetingSection />
-      <VoiceSection />
+      <motion.div {...enter(0)}>
+        <MeetingSection />
+      </motion.div>
+      <motion.div {...enter(1)}>
+        <VoiceSection />
+      </motion.div>
 
       {cameras.length > 0 ? (
-        <section className={styles.section}>
+        <motion.section className={styles.section} {...enter(2)}>
           <div className={styles.row}>
             <h2 className={styles.sectionTitle}>{t('settings.cameraTitle')}</h2>
             <div className={styles.row}>
@@ -58,15 +65,19 @@ export default function Settings() {
               </select>
             </div>
           </div>
-        </section>
+        </motion.section>
       ) : null}
 
-      <section className={styles.section} aria-label={t('settings.creditsTitle')}>
+      <motion.section
+        className={styles.section}
+        aria-label={t('settings.creditsTitle')}
+        {...enter(3)}
+      >
         <h2 className={styles.sectionTitle}>{t('settings.creditsTitle')}</h2>
         <p className={styles.muted}>{t('settings.credits')}</p>
-      </section>
+      </motion.section>
 
-      <section className={styles.section} aria-label={t('settings.profile')}>
+      <motion.section className={styles.section} aria-label={t('settings.profile')} {...enter(4)}>
         <div className={styles.row}>
           <div className={styles.profile}>
             <span className={styles.avatar} aria-hidden>
@@ -85,7 +96,7 @@ export default function Settings() {
             onClick={() => void onLogout()}
           />
         </div>
-      </section>
+      </motion.section>
     </div>
   );
 }

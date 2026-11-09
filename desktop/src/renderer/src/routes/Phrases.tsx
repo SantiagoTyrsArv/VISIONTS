@@ -1,3 +1,4 @@
+import { motion } from 'motion/react';
 import type { ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -10,6 +11,7 @@ import { usePlayback } from '@/store/playback';
 import { signLabels, useSignModel } from '@/store/signModel';
 import { Button } from '@/ui/Button';
 import { IconSpeaker } from '@/ui/icons';
+import { useEnter } from '@/ui/motion/useEnter';
 import { NowSaying } from '@/ui/NowSaying';
 import { PhraseCard } from '@/ui/PhraseCard';
 
@@ -21,6 +23,7 @@ export default function Phrases() {
   const { data, isPending, isError, refetch, isRefetching } = usePhrases();
   const lastText = usePlayback((s) => s.lastText);
   const signs = useSignModel(useShallow(signLabels));
+  const enter = useEnter();
   usePhraseShortcuts(data, speak);
 
   let content: ReactNode;
@@ -37,14 +40,15 @@ export default function Phrases() {
     content = (
       <div className={styles.grid}>
         {data.map((p, i) => (
-          <PhraseCard
-            key={p.code}
-            text={p.text_es}
-            shortcut={i < 9 ? i + 1 : undefined}
-            active={p.text_es === lastText}
-            hasSign={signs.includes(p.code)}
-            onClick={() => speak(p)}
-          />
+          <motion.div key={p.code} className={styles.cell} {...enter(i)}>
+            <PhraseCard
+              text={p.text_es}
+              shortcut={i < 9 ? i + 1 : undefined}
+              active={p.text_es === lastText}
+              hasSign={signs.includes(p.code)}
+              onClick={() => speak(p)}
+            />
+          </motion.div>
         ))}
       </div>
     );
