@@ -85,7 +85,7 @@ export const es = {
   'camera.recentTitle': 'Lo que has dicho',
   'camera.quickTitle': 'Frases rápidas',
   'camera.quickHint': 'pulsa su número',
-  'camera.recentEmpty': 'Aquí aparecerán las frases reconocidas.',
+  'camera.recentEmpty': 'Aquí aparecerán las frases que digas.',
 
   'diagnostics.title': 'Diagnóstico (solo desarrollo)',
   'diagnostics.neutral': 'Sin seña (neutral)',
