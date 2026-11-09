@@ -356,10 +356,10 @@
 .recentList li {
   color: var(--text-muted);
 }
-/* Punto «activo» (manos detectadas, cámara encendida): pulsa en menta. */
+/* Solo late el punto de «manos detectadas»: lento, para no distraer al lado del vídeo. */
 @media (prefers-reduced-motion: no-preference) {
   .dotPulse {
-    animation: livePulse 0.6s ease-in-out infinite alternate;
+    animation: livePulse 1.2s ease-in-out infinite alternate;
   }
 }
 @keyframes livePulse {

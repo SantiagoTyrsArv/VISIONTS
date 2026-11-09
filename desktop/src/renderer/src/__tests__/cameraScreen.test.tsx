@@ -5,11 +5,13 @@ import { HashRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Camera from '@/routes/Camera';
+import { usePlayback } from '@/store/playback';
 import { useSignModel } from '@/store/signModel';
 
 const speak = vi.fn();
 const recognizerMock = vi.hoisted(() => ({
   emitSign: vi.fn(),
+  emitStatus: vi.fn(),
   start: vi.fn(),
   stop: vi.fn(),
   onSign: vi.fn(),
@@ -31,6 +33,7 @@ vi.mock('@/services/recognition/MediaPipeSignRecognizer', () => ({
       return vi.fn();
     }
     onStatus(callback: (status: unknown) => void): () => void {
+      recognizerMock.emitStatus.mockImplementation(callback);
       callback({ phase: 'ready', handsDetected: false, modelAvailable: false });
       return vi.fn();
     }
@@ -81,6 +84,8 @@ beforeEach(() => {
   openCamera.mockReset();
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
   recognizerMock.emitSign.mockReset();
+  recognizerMock.emitStatus.mockReset();
+  usePlayback.setState({ lastText: null, playing: false });
   recognizerMock.start.mockReset();
   recognizerMock.stop.mockReset();
   useSignModel.setState({ status: 'error', classifier: null, labels: [], valAccuracy: null });
@@ -202,5 +207,47 @@ describe('pantalla de cámara', () => {
     expect(items).toHaveLength(5);
     expect(items[0]).toHaveTextContent('Gracias');
     expect(speak).toHaveBeenCalledTimes(6);
+  });
+
+  it('con la cámara en error, la banda de lo que suena no tapa «Reintentar»', async () => {
+    usePlayback.setState({ lastText: 'Hola' });
+    openCamera.mockRejectedValue(Object.assign(new Error(), { name: 'NotReadableError' }));
+    renderScreen();
+    await screen.findByRole('alert');
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
+    expect(screen.queryByText('Lo último que dijiste')).not.toBeInTheDocument();
+  });
+
+  it('con la cámara funcionando, la banda muestra lo último que se dijo', async () => {
+    usePlayback.setState({ lastText: 'Hola' });
+    openCamera.mockResolvedValue(fakeStream);
+    renderScreen();
+    await recognizerStarted();
+    expect(screen.getByText('Lo último que dijiste')).toBeInTheDocument();
+  });
+
+  it('solo late el punto de las manos detectadas; cámara y modelo quedan quietos', async () => {
+    useSignModel.setState({ status: 'ready', labels: ['hello', 'neutral'] });
+    openCamera.mockResolvedValue(fakeStream);
+    renderScreen();
+    await recognizerStarted();
+    await act(async () => {
+      recognizerMock.emitStatus({ phase: 'ready', handsDetected: true, modelAvailable: true });
+    });
+    const dot = (label: string) => {
+      const row = screen.getByText(
+        (_, el) => el?.tagName === 'P' && (el.textContent ?? '').startsWith(label),
+      );
+      return row.querySelector('[aria-hidden]')!.className;
+    };
+    await vi.waitFor(() => expect(dot('Detección de manos')).toMatch(/dotLive/));
+    expect(dot('Cámara')).toMatch(/dotLive/);
+    expect(dot('Cámara')).not.toMatch(/dotPulse/);
+    expect(dot('Modelo de señas')).toMatch(/dotLive/);
+    expect(dot('Modelo de señas')).not.toMatch(/dotPulse/);
+    expect(dot('Detección de manos')).toMatch(/dotPulse/);
+    expect(screen.getByRole('status').querySelector('[aria-hidden]')!.className).toMatch(
+      /dotPulse/,
+    );
   });
 });

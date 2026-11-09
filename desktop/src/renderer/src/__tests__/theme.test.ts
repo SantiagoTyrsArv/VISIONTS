@@ -62,6 +62,15 @@ describe('microanimaciones de los componentes', () => {
     expect(rule(ui, '.button:active:not(:disabled)')).toMatch(/transform:\s*none/);
   });
 
+  it('el pulso de «manos detectadas» es lento (≥ 1,2 s por tramo) y solo con movimiento', () => {
+    const block = /@media \(prefers-reduced-motion: no-preference\) \{([\s\S]*?)\n\}/g;
+    const inside = [...routes.matchAll(block)].map((m) => m[1]).join('\n');
+    const pulse = rule(inside, '.dotPulse');
+    const [, value, unit] = /animation:\s*\w+\s+(\d+(?:\.\d+)?)(ms|s)\b/.exec(pulse) ?? [];
+    expect(unit === 's' ? Number(value) * 1000 : Number(value)).toBeGreaterThanOrEqual(1200);
+    expect(rule(routes.replace(block, ''), '.dotPulse')).not.toMatch(/animation:/);
+  });
+
   it('ninguna transition dura más de 600 ms', () => {
     for (const source of [ui, routes]) {
       for (const [decl] of source.matchAll(/transition:[^;]*;/g)) {

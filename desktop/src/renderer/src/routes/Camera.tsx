@@ -23,10 +23,16 @@ const QUICK = 9;
 
 type Said = { id: number; text: string };
 
-function Status({ ok, label }: Readonly<{ ok: boolean; label: string }>) {
+/** `pulse`: el punto late mientras está en verde (solo para lo que cambia en vivo: las manos). */
+function Status({
+  ok,
+  label,
+  pulse = false,
+}: Readonly<{ ok: boolean; label: string; pulse?: boolean }>) {
+  const live = pulse ? `${styles.dotLive} ${styles.dotPulse}` : styles.dotLive;
   return (
     <span className={ok ? styles.statusValue : `${styles.statusValue} ${styles.statusWarn}`}>
-      <span className={ok ? `${styles.dotLive} ${styles.dotPulse}` : styles.dotWarn} aria-hidden />
+      <span className={ok ? live : styles.dotWarn} aria-hidden />
       {label}
     </span>
   );
@@ -113,7 +119,8 @@ export default function Camera(): JSX.Element {
               {cam.kind === 'starting' ? t('camera.starting') : t(visionMessageKey(recognition))}
             </output>
           )}
-          <NowSaying overlay />
+          {/* Con la cámara en error la banda taparía «Reintentar». */}
+          {cam.kind === 'error' ? null : <NowSaying overlay />}
         </motion.div>
 
         <aside className={styles.aside}>
@@ -147,7 +154,7 @@ export default function Camera(): JSX.Element {
             </p>
             <p className={styles.statusRow}>
               {t('camera.statusHands')}
-              <Status ok={hands} label={t(hands ? 'camera.handsYes' : 'camera.handsNo')} />
+              <Status ok={hands} pulse label={t(hands ? 'camera.handsYes' : 'camera.handsNo')} />
             </p>
             <p className={styles.statusRow}>
               {t('camera.statusModel')}
