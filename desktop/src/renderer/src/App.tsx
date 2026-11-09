@@ -32,7 +32,7 @@ export function AppRoutes() {
   // había hasta acabar el fundido aunque la sesión o la URL ya hayan cambiado.
   return (
     <AnimatePresence mode="wait" initial={false} custom={group === '/reunion'}>
-      <PageTransition key={group} instant={group === '/reunion'}>
+      <PageTransition key={group} instant={group === '/reunion'} shift={false}>
         {group === 'loading' ? null : (
           <Routes location={redirect ?? location}>
             <Route path="/login" element={<Login />} />

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authApi, usersApi } from '@/api/endpoints';
 import { tokenStorage } from '@/auth/tokenStorage';
+import { usePlayback } from '@/store/playback';
 import { useSession } from '@/store/session';
 
 vi.mock('@/api/endpoints', () => ({
@@ -102,5 +103,11 @@ describe('sesión', () => {
     expect(await tokenStorage.getRefreshToken()).toBeNull();
     expect(useSession.getState().status).not.toBe('authenticated');
     spy.mockRestore();
+  });
+
+  it('al cerrar sesión se olvida lo último que se dijo', async () => {
+    usePlayback.setState({ lastText: 'Gracias', playing: true });
+    await useSession.getState().logout();
+    expect(usePlayback.getState()).toMatchObject({ lastText: null, playing: false });
   });
 });

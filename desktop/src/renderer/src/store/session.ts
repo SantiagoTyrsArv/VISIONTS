@@ -4,6 +4,7 @@ import { authApi, usersApi } from '@/api/endpoints';
 import { setAuthFailureHandler } from '@/api/client';
 import type { User } from '@/api/types';
 import { tokenStorage } from '@/auth/tokenStorage';
+import { usePlayback } from '@/store/playback';
 
 type Status = 'loading' | 'authenticated' | 'unauthenticated';
 
@@ -61,10 +62,16 @@ export const useSession = create<SessionState>((set) => ({
       // ignorado a propósito: ver comentario superior
     } finally {
       await tokenStorage.clear();
-      set({ status: 'unauthenticated', user: null });
+      endSession();
     }
   },
 }));
 
+/** Cierra la sesión local y olvida lo último que se dijo: quien entre después no debe verlo. */
+function endSession(): void {
+  usePlayback.setState({ lastText: null, playing: false });
+  useSession.setState({ status: 'unauthenticated', user: null });
+}
+
 // Si el refresh falla en cualquier petición, se cierra la sesión local.
-setAuthFailureHandler(() => useSession.setState({ status: 'unauthenticated', user: null }));
+setAuthFailureHandler(endSession);

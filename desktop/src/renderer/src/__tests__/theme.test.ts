@@ -87,3 +87,28 @@ describe('microanimaciones de los componentes', () => {
     }
   });
 });
+
+describe('layout tras la revisión visual', () => {
+  const read = (file: string) => readFileSync(resolve(__dirname, file), 'utf8');
+  const ui = read('../ui/ui.module.css');
+  const routes = read('../routes/routes.module.css');
+  const block = (source: string, selector: string) =>
+    new RegExp(String.raw`\n${selector.replaceAll('.', String.raw`\.`)} \{([^}]*)\}`).exec(
+      source,
+    )?.[1] ?? '';
+  const basis = (source: string, selector: string) =>
+    Number(/flex:\s*\d+\s+\d+\s+(\d+)px/.exec(block(source, selector))?.[1]);
+
+  it('la banda sobre el vídeo se queda en una sola fila', () => {
+    expect(block(ui, '.nowSayingOverlay')).toMatch(/flex-wrap:\s*nowrap/);
+  });
+
+  it('el acceso ocupa toda la ventana aunque esté envuelto por otros contenedores', () => {
+    expect(block(ui, '.auth')).toMatch(/min-height:\s*100vh/);
+  });
+
+  // Con la ventana por defecto el contenido mide ~735 px: vídeo + columna lateral + hueco deben caber.
+  it('el vídeo y la columna lateral caben lado a lado en la ventana por defecto', () => {
+    expect(basis(routes, '.stage') + basis(routes, '.aside') + 24).toBeLessThanOrEqual(700);
+  });
+});

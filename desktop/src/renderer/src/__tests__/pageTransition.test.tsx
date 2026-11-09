@@ -210,6 +210,19 @@ describe('transiciones entre pantallas', () => {
     expect(mounts.camera).toBe(1);
   });
 
+  it('al cambiar de pantalla la nueva empieza arriba del todo', async () => {
+    const scrollTo = vi.fn();
+    HTMLElement.prototype.scrollTo = scrollTo;
+    const user = userEvent.setup();
+    renderAt('/frases');
+    const nav = await screen.findByRole('navigation');
+    expect(scrollTo).not.toHaveBeenCalled();
+    await user.click(within(nav).getByRole('link', { name: 'Ajustes' }));
+    expect(await screen.findByText('pantalla ajustes')).toBeInTheDocument();
+    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith({ top: 0 }));
+    expect(scrollTo.mock.contexts[0]).toBe(screen.getByRole('main'));
+  });
+
   it('con sesión, /login lleva a /camara', async () => {
     renderAt('/login');
     expect(await screen.findByText('pantalla camara')).toBeInTheDocument();
@@ -262,6 +275,11 @@ describe('PageTransition', () => {
     motionFlags.reduced = true;
     const { container } = render(<PageTransition>x</PageTransition>);
     expect(container.firstElementChild).toHaveAttribute('data-duration', '0');
+  });
+
+  it('sin desplazamiento (cambio entre grupos de rutas) solo funde', () => {
+    const { container } = render(<PageTransition shift={false}>x</PageTransition>);
+    expect(container.firstElementChild).toHaveAttribute('data-shift', '0');
   });
 
   it('instant (reunión) no anima', () => {

@@ -1,4 +1,5 @@
 import { AnimatePresence } from 'motion/react';
+import { useRef } from 'react';
 import { NavLink, useLocation, useOutlet } from 'react-router';
 
 import { useMeetingMode } from '@/hooks/useMeetingMode';
@@ -23,6 +24,7 @@ export function AppLayout() {
   useVoicePreload();
   const location = useLocation();
   const outlet = useOutlet();
+  const mainRef = useRef<HTMLElement>(null);
   const { enter } = useMeetingMode();
   const { devices } = useOutputDevices();
   const meetingOutput = useSettings((s) => s.meetingOutput);
@@ -51,8 +53,13 @@ export function AppLayout() {
           </button>
         </div>
       </nav>
-      <main className={styles.content}>
-        <AnimatePresence mode="wait" initial={false}>
+      <main ref={mainRef} className={styles.content}>
+        {/* Al acabar la salida, la pantalla nueva empieza arriba y no donde se quedó la anterior. */}
+        <AnimatePresence
+          mode="wait"
+          initial={false}
+          onExitComplete={() => mainRef.current?.scrollTo?.({ top: 0 })}
+        >
           <PageTransition key={location.pathname}>{outlet}</PageTransition>
         </AnimatePresence>
       </main>

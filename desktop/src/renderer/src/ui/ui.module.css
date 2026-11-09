@@ -140,7 +140,8 @@
 
 /* ---------- Pantallas de acceso: panel de marca + formulario ---------- */
 .auth {
-  min-height: 100%;
+  /* 100vh: lo envuelven contenedores sin altura (capa de arranque, transición). */
+  min-height: 100vh;
   display: flex;
   flex-wrap: wrap;
 }
@@ -405,11 +406,22 @@
   right: 16px;
   bottom: 16px;
   gap: 16px;
-  padding: 14px 18px;
+  padding: 12px 16px;
   border-radius: var(--radius-m);
+  /* Sobre el vídeo, una sola fila: partida taparía media imagen. */
+  flex-wrap: nowrap;
+}
+.nowSayingOverlay .nowSayingText {
+  flex: 1 1 0;
 }
 .nowSayingOverlay .nowSayingPhrase {
-  font-size: 26px;
+  font-size: 24px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nowSayingOverlay .stopBtn {
+  flex: none;
 }
 .eyebrow {
   font-size: 13px;
