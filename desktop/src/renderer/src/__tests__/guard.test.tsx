@@ -23,9 +23,10 @@ function renderAt(path: string) {
 beforeEach(() => useSession.setState({ status: 'loading', user: null }));
 
 describe('guard de rutas', () => {
-  it('muestra el splash mientras se restaura la sesión', () => {
+  it('mientras carga no pinta ni login ni la ruta', () => {
     renderAt('/frases');
-    expect(screen.getByRole('status')).toHaveTextContent('Cargando…');
+    expect(screen.queryByText('login')).not.toBeInTheDocument();
+    expect(screen.queryByText('frases')).not.toBeInTheDocument();
   });
 
   it('sin sesión redirige a login', () => {

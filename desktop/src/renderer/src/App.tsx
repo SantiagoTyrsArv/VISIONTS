@@ -1,4 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
+import { MotionConfig } from 'motion/react';
 import { useEffect } from 'react';
 import { HashRouter, Navigate, Route, Routes } from 'react-router';
 
@@ -12,6 +13,7 @@ import Phrases from '@/routes/Phrases';
 import Register from '@/routes/Register';
 import Settings from '@/routes/Settings';
 import { useSession } from '@/store/session';
+import { BootOverlay } from '@/ui/loading/BootOverlay';
 
 export function App() {
   useEffect(() => {
@@ -19,24 +21,27 @@ export function App() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <HashRouter>
-        <Routes>
-          <Route element={<RequireGuest />}>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-          </Route>
-          <Route element={<RequireAuth />}>
-            <Route element={<AppLayout />}>
-              <Route path="/frases" element={<Phrases />} />
-              <Route path="/camara" element={<Camera />} />
-              <Route path="/ajustes" element={<Settings />} />
+    <MotionConfig reducedMotion="user">
+      <QueryClientProvider client={queryClient}>
+        <BootOverlay />
+        <HashRouter>
+          <Routes>
+            <Route element={<RequireGuest />}>
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
             </Route>
-            <Route path="/reunion" element={<Meeting />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/frases" replace />} />
-        </Routes>
-      </HashRouter>
-    </QueryClientProvider>
+            <Route element={<RequireAuth />}>
+              <Route element={<AppLayout />}>
+                <Route path="/frases" element={<Phrases />} />
+                <Route path="/camara" element={<Camera />} />
+                <Route path="/ajustes" element={<Settings />} />
+              </Route>
+              <Route path="/reunion" element={<Meeting />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/frases" replace />} />
+          </Routes>
+        </HashRouter>
+      </QueryClientProvider>
+    </MotionConfig>
   );
 }

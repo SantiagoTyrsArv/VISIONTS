@@ -1,0 +1,64 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+
+import { PHRASES_KEY } from '@/api/usePhrases';
+import { useSession } from '@/store/session';
+import { useSignModel } from '@/store/signModel';
+
+import styles from './loading.module.css';
+import { LoadingScreen } from './LoadingScreen';
+import { startupSteps } from './startupSteps';
+
+/** La pantalla de carga dura al menos esto, para que no parpadee. */
+export const MIN_BOOT_MS = 1200;
+/** Duración del fundido de salida. */
+export const BOOT_FADE_MS = 300;
+
+/** Estado de las frases sin lanzar la consulta: la arranca AppLayout. */
+function usePhrasesState(): 'loading' | 'done' {
+  const queryClient = useQueryClient();
+  const cache = queryClient.getQueryCache();
+  return useSyncExternalStore(
+    (onChange) => cache.subscribe(onChange),
+    () => {
+      const state = queryClient.getQueryState(PHRASES_KEY);
+      return state && (state.data !== undefined || state.status === 'error') ? 'done' : 'loading';
+    },
+  );
+}
+
+/** Capa fija sobre el router: cubre el arranque y sale una sola vez. */
+export function BootOverlay() {
+  const session = useSession((s) => s.status);
+  const model = useSignModel((s) => s.status);
+  const phrases = usePhrasesState();
+  const reduced = useReducedMotion();
+  const [minElapsed, setMinElapsed] = useState(false);
+  const [booted, setBooted] = useState(false);
+
+  useEffect(() => {
+    const id = setTimeout(() => setMinElapsed(true), MIN_BOOT_MS);
+    return () => clearTimeout(id);
+  }, []);
+
+  const { steps, finished, progress } = startupSteps({ session, model, phrases });
+
+  // Una vez fuera no vuelve: `booted` nunca se revierte.
+  if (finished && minElapsed && !booted) setBooted(true);
+
+  return (
+    <AnimatePresence>
+      {!booted && (
+        <motion.div
+          className={styles.overlay}
+          initial={false}
+          exit={{ opacity: 0 }}
+          transition={{ duration: BOOT_FADE_MS / 1000, ease: 'easeOut' }}
+        >
+          <LoadingScreen steps={steps} progress={progress} animate={!reduced} />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}

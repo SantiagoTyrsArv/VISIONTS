@@ -155,3 +155,12 @@
     opacity: 0;
   }
 }
+
+/* Capa fija a pantalla completa sobre el router durante el arranque. */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: auto;
+  background: var(--bg);
+}

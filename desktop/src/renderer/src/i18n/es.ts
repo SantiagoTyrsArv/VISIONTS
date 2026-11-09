@@ -2,7 +2,6 @@
 // otro idioma consiste en crear otro diccionario con las mismas claves.
 export const es = {
   'app.name': 'SeñaVoz',
-  'app.loading': 'Cargando…',
 
   'loading.title': 'Cargando SeñaVoz',
   'loading.session': 'Comprobando tu sesión',
