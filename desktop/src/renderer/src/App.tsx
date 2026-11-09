@@ -30,7 +30,7 @@ export function AppRoutes() {
   // La pantalla que sale conserva su último elemento (con su `location`): sigue pintando lo que
   // había hasta acabar el fundido aunque la sesión o la URL ya hayan cambiado.
   return (
-    <AnimatePresence mode="wait" initial={false}>
+    <AnimatePresence mode="wait" initial={false} custom={group === '/reunion'}>
       <PageTransition key={group} instant={group === '/reunion'}>
         {group === 'loading' ? null : (
           <Routes location={redirect ?? location}>

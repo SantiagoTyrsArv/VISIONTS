@@ -1,12 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { AnimatePresence } from 'motion/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect } from 'react';
-import { MemoryRouter, useLocation } from 'react-router';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AppRoutes } from '@/App';
 import { sessionRoute } from '@/routes/sessionRoute';
+import { useMeeting } from '@/store/meeting';
 import { useSession } from '@/store/session';
 import { PageTransition } from '@/ui/motion/PageTransition';
 
@@ -81,6 +83,15 @@ function Where() {
   return <output data-testid="where">{useLocation().pathname}</output>;
 }
 
+function GoToMeeting() {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate('/reunion')}>
+      ir a reunión
+    </button>
+  );
+}
+
 function renderAt(path: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -88,6 +99,7 @@ function renderAt(path: string) {
       <MemoryRouter initialEntries={[path]}>
         <AppRoutes />
         <Where />
+        <GoToMeeting />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -97,6 +109,7 @@ beforeEach(() => {
   speak.mockReset();
   motionFlags.reduced = false;
   realCamera.on = false;
+  useMeeting.setState({ active: false });
   mounts.camera = 0;
   mounts.login = 0;
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
@@ -204,6 +217,19 @@ describe('transiciones entre pantallas', () => {
   });
 });
 
+describe('entrar en la reunión', () => {
+  it('la pantalla principal sale al instante hacia la reunión', async () => {
+    renderAt('/camara');
+    const nav = await screen.findByRole('navigation');
+    expect(nav.closest('[data-exit-duration]')).toHaveAttribute('data-exit-duration', '0.15');
+    act(() => {
+      useMeeting.setState({ active: true });
+      fireEvent.click(screen.getByRole('button', { name: 'ir a reunión' }));
+    });
+    expect(nav.closest('[data-exit-duration]')).toHaveAttribute('data-exit-duration', '0');
+  });
+});
+
 describe('ruta según la sesión', () => {
   it('mientras se restaura la sesión no pinta ni login ni la ruta', () => {
     useSession.setState({ status: 'loading' });
@@ -241,5 +267,26 @@ describe('PageTransition', () => {
   it('instant (reunión) no anima', () => {
     const { container } = render(<PageTransition instant>x</PageTransition>);
     expect(container.firstElementChild).toHaveAttribute('data-duration', '0');
+  });
+
+  // `custom` de AnimatePresence: el destino cambia sin animar (la reunión).
+  function Swap({ page, toInstant }: Readonly<{ page: string; toInstant: boolean }>) {
+    return (
+      <AnimatePresence mode="wait" initial={false} custom={toInstant}>
+        <PageTransition key={page}>{page}</PageTransition>
+      </AnimatePresence>
+    );
+  }
+
+  it('la pantalla que sale hacia la reunión lo hace al instante', () => {
+    const { rerender } = render(<Swap page="señas" toInstant={false} />);
+    rerender(<Swap page="reunión" toInstant />);
+    expect(screen.getByText('señas')).toHaveAttribute('data-exit-duration', '0');
+  });
+
+  it('entre pantallas normales la salida dura 150 ms', () => {
+    const { rerender } = render(<Swap page="señas" toInstant={false} />);
+    rerender(<Swap page="frases" toInstant={false} />);
+    expect(screen.getByText('señas')).toHaveAttribute('data-exit-duration', '0.15');
   });
 });
