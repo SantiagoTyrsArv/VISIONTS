@@ -60,10 +60,11 @@ export function App() {
   return (
     <MotionConfig reducedMotion="user">
       <QueryClientProvider client={queryClient}>
-        <BootOverlay />
-        <HashRouter>
-          <AppRoutes />
-        </HashRouter>
+        <BootOverlay>
+          <HashRouter>
+            <AppRoutes />
+          </HashRouter>
+        </BootOverlay>
       </QueryClientProvider>
     </MotionConfig>
   );

@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PHRASES_KEY } from '@/api/usePhrases';
+import type { Phrase } from '@/api/types';
+import { usePhraseShortcuts } from '@/hooks/usePhraseShortcuts';
 import { useSignModelBoot } from '@/hooks/useSignModelBoot';
 import { useSession } from '@/store/session';
 import { useSignModel } from '@/store/signModel';
@@ -135,5 +137,48 @@ describe('BootOverlay', () => {
     advance(MIN_BOOT_MS);
     expect(load).toHaveBeenCalledTimes(1);
     await gone();
+  });
+
+  describe('lo de debajo durante el arranque', () => {
+    const phrases: Phrase[] = [{ id: '1', code: 'hello', text_es: 'Hola', is_default: true }];
+    const speak = vi.fn();
+    function Below() {
+      usePhraseShortcuts(phrases, speak);
+      return <button type="button">debajo</button>;
+    }
+    function mountWithContent() {
+      render(
+        <QueryClientProvider client={client}>
+          <BootOverlay>
+            <Below />
+          </BootOverlay>
+        </QueryClientProvider>,
+      );
+    }
+    const finishBoot = async () => {
+      act(() => useSession.setState({ status: 'unauthenticated' }));
+      advance(MIN_BOOT_MS);
+      await gone();
+    };
+
+    beforeEach(() => speak.mockReset());
+
+    it('es inerte mientras se ve la capa y deja de serlo al salir', async () => {
+      mountWithContent();
+      expect(
+        screen.getByRole('button', { name: 'debajo', hidden: true }).closest('[inert]'),
+      ).not.toBeNull();
+      await finishBoot();
+      expect(screen.getByRole('button', { name: 'debajo' }).closest('[inert]')).toBeNull();
+    });
+
+    it('pulsar «1» durante el arranque no habla; al acabar, sí', async () => {
+      mountWithContent();
+      fireEvent.keyDown(window, { key: '1' });
+      expect(speak).not.toHaveBeenCalled();
+      await finishBoot();
+      fireEvent.keyDown(window, { key: '1' });
+      expect(speak).toHaveBeenCalledTimes(1);
+    });
   });
 });

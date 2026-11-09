@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react';
+import type { ReactNode } from 'react';
 
 import { PHRASES_KEY } from '@/api/usePhrases';
+import { useBoot } from '@/store/boot';
 import { useSession } from '@/store/session';
 import { useSignModel } from '@/store/signModel';
 
@@ -28,8 +30,12 @@ function usePhrasesState(): 'loading' | 'done' {
   });
 }
 
-/** Capa fija sobre el router: cubre el arranque y sale una sola vez. El modelo lo carga `useSignModelBoot`. */
-export function BootOverlay() {
+/**
+ * Capa fija sobre el router: cubre el arranque y sale una sola vez. Mientras se ve, lo de debajo
+ * (`children`) es inerte y `useBoot` avisa a los atajos de teclado. El modelo lo carga
+ * `useSignModelBoot`.
+ */
+export function BootOverlay({ children }: Readonly<{ children?: ReactNode }>) {
   const session = useSession((s) => s.status);
   const model = useSignModel((s) => s.status);
   const phrases = usePhrasesState();
@@ -53,18 +59,27 @@ export function BootOverlay() {
   // Una vez fuera no vuelve: `booted` nunca se revierte.
   if (((finished && minElapsed) || capped) && !booted) setBooted(true);
 
+  // Antes de pintar, para que ningún atajo se cuele entre el render y el efecto.
+  useLayoutEffect(() => {
+    useBoot.setState({ booting: !booted });
+    return () => useBoot.setState({ booting: false });
+  }, [booted]);
+
   return (
-    <AnimatePresence>
-      {!booted && (
-        <motion.div
-          className={styles.overlay}
-          initial={false}
-          exit={{ opacity: 0 }}
-          transition={{ duration: reduced ? 0 : BOOT_FADE_MS / 1000, ease: 'easeOut' }}
-        >
-          <LoadingScreen steps={steps} progress={progress} animate={!reduced} />
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <>
+      <AnimatePresence>
+        {!booted && (
+          <motion.div
+            className={styles.overlay}
+            initial={false}
+            exit={{ opacity: 0 }}
+            transition={{ duration: reduced ? 0 : BOOT_FADE_MS / 1000, ease: 'easeOut' }}
+          >
+            <LoadingScreen steps={steps} progress={progress} animate={!reduced} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <div inert={!booted}>{children}</div>
+    </>
   );
 }

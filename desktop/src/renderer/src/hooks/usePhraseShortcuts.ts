@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 import type { Phrase } from '@/api/types';
+import { useBoot } from '@/store/boot';
 
 function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -21,6 +22,8 @@ export function usePhraseShortcuts(
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.repeat || e.ctrlKey || e.altKey || e.metaKey || isTyping(e.target)) return;
+      // Con la capa de arranque delante, la pantalla de debajo no debe hablar.
+      if (useBoot.getState().booting) return;
       if (!/^[1-9]$/.test(e.key)) return;
       const phrase = latest.current.phrases?.[Number(e.key) - 1];
       if (!phrase) return;
