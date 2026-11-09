@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { PHRASES_KEY } from '@/api/usePhrases';
 import { useSession } from '@/store/session';
@@ -14,18 +14,18 @@ import { startupSteps } from './startupSteps';
 export const MIN_BOOT_MS = 1200;
 /** Duración del fundido de salida. */
 export const BOOT_FADE_MS = 300;
+/** Tope de seguridad: si algo no responde, la capa sale igualmente. */
+export const MAX_BOOT_MS = 10000;
 
 /** Estado de las frases sin lanzar la consulta: la arranca AppLayout. */
 function usePhrasesState(): 'loading' | 'done' {
   const queryClient = useQueryClient();
   const cache = queryClient.getQueryCache();
-  return useSyncExternalStore(
-    (onChange) => cache.subscribe(onChange),
-    () => {
-      const state = queryClient.getQueryState(PHRASES_KEY);
-      return state && (state.data !== undefined || state.status === 'error') ? 'done' : 'loading';
-    },
-  );
+  const subscribe = useCallback((onChange: () => void) => cache.subscribe(onChange), [cache]);
+  return useSyncExternalStore(subscribe, () => {
+    const state = queryClient.getQueryState(PHRASES_KEY);
+    return state && (state.data !== undefined || state.status === 'error') ? 'done' : 'loading';
+  });
 }
 
 /** Capa fija sobre el router: cubre el arranque y sale una sola vez. */
@@ -37,15 +37,30 @@ export function BootOverlay() {
   const [minElapsed, setMinElapsed] = useState(false);
   const [booted, setBooted] = useState(false);
 
+  const [capped, setCapped] = useState(false);
+  const modelRequested = useRef(false);
+
   useEffect(() => {
-    const id = setTimeout(() => setMinElapsed(true), MIN_BOOT_MS);
-    return () => clearTimeout(id);
+    const min = setTimeout(() => setMinElapsed(true), MIN_BOOT_MS);
+    const cap = setTimeout(() => setCapped(true), MAX_BOOT_MS);
+    return () => {
+      clearTimeout(min);
+      clearTimeout(cap);
+    };
   }, []);
+
+  // El modelo va empaquetado: se carga una vez con la sesión, aunque se arranque en /reunion
+  // (fuera de AppLayout).
+  useEffect(() => {
+    if (session !== 'authenticated' || modelRequested.current) return;
+    modelRequested.current = true;
+    void useSignModel.getState().load();
+  }, [session]);
 
   const { steps, finished, progress } = startupSteps({ session, model, phrases });
 
   // Una vez fuera no vuelve: `booted` nunca se revierte.
-  if (finished && minElapsed && !booted) setBooted(true);
+  if (((finished && minElapsed) || capped) && !booted) setBooted(true);
 
   return (
     <AnimatePresence>
@@ -54,7 +69,7 @@ export function BootOverlay() {
           className={styles.overlay}
           initial={false}
           exit={{ opacity: 0 }}
-          transition={{ duration: BOOT_FADE_MS / 1000, ease: 'easeOut' }}
+          transition={{ duration: reduced ? 0 : BOOT_FADE_MS / 1000, ease: 'easeOut' }}
         >
           <LoadingScreen steps={steps} progress={progress} animate={!reduced} />
         </motion.div>

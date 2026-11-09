@@ -1,13 +1,15 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PHRASES_KEY } from '@/api/usePhrases';
 import { useSession } from '@/store/session';
 import { useSignModel } from '@/store/signModel';
-import { BootOverlay, MIN_BOOT_MS } from '@/ui/loading/BootOverlay';
+import { BootOverlay, MAX_BOOT_MS, MIN_BOOT_MS } from '@/ui/loading/BootOverlay';
 
 let client: QueryClient;
+const realLoad = useSignModel.getState().load;
 
 function mount() {
   render(
@@ -32,7 +34,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   useSession.setState({ status: 'loading', user: null });
-  useSignModel.setState({ status: 'loading' });
+  useSignModel.setState({ status: 'loading', load: realLoad });
 });
 
 afterEach(() => {
@@ -40,7 +42,7 @@ afterEach(() => {
 });
 
 describe('BootOverlay', () => {
-  it('con la sesión cargando se ve la pantalla de carga', async () => {
+  it('con la sesión cargando se ve la pantalla de carga', () => {
     mount();
     expect(overlay()).toBeInTheDocument();
   });
@@ -91,5 +93,32 @@ describe('BootOverlay', () => {
       advance(MIN_BOOT_MS);
       await gone();
     }
+  });
+
+  it('con el modelo atascado sale igualmente al llegar al tope', async () => {
+    useSession.setState({ status: 'authenticated' });
+    useSignModel.setState({ load: () => new Promise(() => {}) });
+    mount();
+    advance(MAX_BOOT_MS - 1);
+    expect(overlay()).toBeInTheDocument();
+    advance(1);
+    await gone();
+  });
+
+  it('con sesión guardada y arranque en /reunion el modelo se carga y la capa sale', async () => {
+    useSession.setState({ status: 'authenticated' });
+    client.setQueryData(PHRASES_KEY, []);
+    const load = vi.fn(async () => useSignModel.setState({ status: 'ready' }));
+    useSignModel.setState({ load });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={['/reunion']}>
+          <BootOverlay />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    advance(MIN_BOOT_MS);
+    expect(load).toHaveBeenCalledTimes(1);
+    await gone();
   });
 });

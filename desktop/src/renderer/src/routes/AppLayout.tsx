@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router';
 
 import { useMeetingMode } from '@/hooks/useMeetingMode';
@@ -7,7 +6,6 @@ import { useVoicePreload } from '@/hooks/useVoicePreload';
 import { t } from '@/i18n';
 import { resolveMeetingOutput } from '@/services/audio/outputDevice';
 import { useSettings } from '@/store/settings';
-import { useSignModel } from '@/store/signModel';
 import { Brand } from '@/ui/Brand';
 import { IconCamera, IconMeeting, IconPhrases, IconSettings } from '@/ui/icons';
 
@@ -21,10 +19,6 @@ const links = [
 
 export function AppLayout() {
   useVoicePreload();
-  // El modelo va empaquetado: se carga una vez al entrar.
-  useEffect(() => {
-    void useSignModel.getState().load();
-  }, []);
   const { enter } = useMeetingMode();
   const { devices } = useOutputDevices();
   const meetingOutput = useSettings((s) => s.meetingOutput);
