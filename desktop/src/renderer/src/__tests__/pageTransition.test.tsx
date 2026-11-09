@@ -1,12 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { PageTransition } from '@/ui/motion/PageTransition';
+import { useEffect } from 'react';
 import { MemoryRouter, useLocation } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AppRoutes } from '@/App';
+import { sessionRoute } from '@/routes/sessionRoute';
 import { useSession } from '@/store/session';
+import { PageTransition } from '@/ui/motion/PageTransition';
 
 const motionFlags = vi.hoisted(() => ({ reduced: false }));
 vi.mock('motion/react', async (orig) => ({
@@ -34,9 +36,20 @@ vi.mock('@/api/endpoints', () => ({
 // La cámara y los ajustes tienen sus propias pruebas: aquí solo importa la navegación. La
 // cámara real solo se monta en la prueba de atajos (con la webcam y el reconocedor simulados).
 const realCamera = vi.hoisted(() => ({ on: false }));
+// Cuántas veces se monta cada pantalla simulada: una pantalla saliente no debe montarse de nuevo.
+const mounts = vi.hoisted(() => ({ camera: 0, login: 0 }));
+function Counted({ name, screen }: Readonly<{ name: keyof typeof mounts; screen: string }>) {
+  useEffect(() => {
+    mounts[name] += 1;
+  }, [name]);
+  return <h1>{screen}</h1>;
+}
 vi.mock('@/routes/Camera', async (orig) => {
   const { default: Camera } = await orig<typeof import('@/routes/Camera')>();
-  return { default: () => (realCamera.on ? <Camera /> : <h1>pantalla camara</h1>) };
+  return {
+    default: () =>
+      realCamera.on ? <Camera /> : <Counted name="camera" screen="pantalla camara" />,
+  };
 });
 vi.mock('@/services/recognition/MediaPipeSignRecognizer', () => ({
   MediaPipeSignRecognizer: class {
@@ -60,7 +73,9 @@ vi.mock('@/services/camera/camera', async (orig) => ({
   listCameras: async () => [],
 }));
 vi.mock('@/routes/Settings', () => ({ default: () => <h1>pantalla ajustes</h1> }));
-vi.mock('@/routes/Login', () => ({ default: () => <h1>pantalla login</h1> }));
+vi.mock('@/routes/Login', () => ({
+  default: () => <Counted name="login" screen="pantalla login" />,
+}));
 
 function Where() {
   return <output data-testid="where">{useLocation().pathname}</output>;
@@ -82,6 +97,8 @@ beforeEach(() => {
   speak.mockReset();
   motionFlags.reduced = false;
   realCamera.on = false;
+  mounts.camera = 0;
+  mounts.login = 0;
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
   useSession.setState({ status: 'authenticated', user: null });
 });
@@ -159,6 +176,53 @@ describe('transiciones entre pantallas', () => {
     act(() => useSession.setState({ status: 'unauthenticated' }));
     expect(screen.getByText('pantalla camara')).toBeInTheDocument();
     expect(await screen.findByText('pantalla login')).toBeInTheDocument();
+  });
+
+  it('al iniciar sesión, el acceso no se vuelve a montar mientras sale', async () => {
+    useSession.setState({ status: 'unauthenticated' });
+    renderAt('/login');
+    await screen.findByText('pantalla login');
+    act(() => useSession.setState({ status: 'authenticated' }));
+    expect(await screen.findByText('pantalla camara')).toBeInTheDocument();
+    expect(screen.getByTestId('where')).toHaveTextContent('/camara');
+    expect(mounts.login).toBe(1);
+  });
+
+  it('al cerrar sesión, la pantalla saliente no se vuelve a montar mientras sale', async () => {
+    renderAt('/camara');
+    await screen.findByText('pantalla camara');
+    act(() => useSession.setState({ status: 'unauthenticated' }));
+    expect(await screen.findByText('pantalla login')).toBeInTheDocument();
+    expect(screen.getByTestId('where')).toHaveTextContent('/login');
+    expect(mounts.camera).toBe(1);
+  });
+
+  it('con sesión, /login lleva a /camara', async () => {
+    renderAt('/login');
+    expect(await screen.findByText('pantalla camara')).toBeInTheDocument();
+    expect(screen.getByTestId('where')).toHaveTextContent('/camara');
+  });
+});
+
+describe('ruta según la sesión', () => {
+  it('mientras se restaura la sesión no pinta ni login ni la ruta', () => {
+    useSession.setState({ status: 'loading' });
+    renderAt('/camara');
+    expect(screen.queryByText('pantalla login')).not.toBeInTheDocument();
+    expect(screen.queryByText('pantalla camara')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['/camara', 'loading', 'loading', null],
+    ['/camara', 'unauthenticated', '/login', '/login'],
+    ['/reunion', 'unauthenticated', '/login', '/login'],
+    ['/register', 'unauthenticated', '/register', null],
+    ['/login', 'authenticated', 'app', '/camara'],
+    ['/register', 'authenticated', 'app', '/camara'],
+    ['/frases', 'authenticated', 'app', null],
+    ['/reunion', 'authenticated', '/reunion', null],
+  ] as const)('%s con sesión %s → grupo %s, redirige a %s', (path, status, group, redirect) => {
+    expect(sessionRoute(path, status)).toEqual({ group, redirect });
   });
 });
 
