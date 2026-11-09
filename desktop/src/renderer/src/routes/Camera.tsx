@@ -12,6 +12,7 @@ import { speechService } from '@/services/speech';
 import { useSignDiagnostics } from '@/store/signDiagnostics';
 import { useSignModel } from '@/store/signModel';
 import { Button } from '@/ui/Button';
+import { useEnter } from '@/ui/motion/useEnter';
 import { NowSaying } from '@/ui/NowSaying';
 import { SignDiagnostics } from '@/ui/SignDiagnostics';
 
@@ -19,9 +20,6 @@ import styles from './routes.module.css';
 
 const RECENT = 5;
 const QUICK = 9;
-/** Entrada de paneles: aparición y 10 px hacia arriba, 0,6 s, 80 ms entre uno y otro. */
-const PANEL_S = 0.6;
-const STAGGER_S = 0.08;
 
 type Said = { id: number; text: string };
 
@@ -70,13 +68,7 @@ export default function Camera(): JSX.Element {
     if (!hands) useSignDiagnostics.getState().clear();
   }, [hands]);
 
-  // Con movimiento reducido los paneles aparecen ya colocados.
-  const panel = (i: number) =>
-    ({
-      initial: reduced ? false : { opacity: 0, y: 10 },
-      animate: { opacity: 1, y: 0 },
-      transition: { duration: PANEL_S, delay: i * STAGGER_S, ease: 'easeOut' },
-    }) as const;
+  const panel = useEnter();
 
   return (
     <div className={styles.page}>

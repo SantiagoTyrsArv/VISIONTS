@@ -47,6 +47,16 @@ describe('microanimaciones de los componentes', () => {
     expect(rule(source, selector)).toMatch(/transform:/);
   });
 
+  it.each([
+    ['.card:hover', ui],
+    ['.navLink:hover', routes],
+  ])('%s solo se mueve con movimiento permitido', (selector, source) => {
+    const block = /@media \(prefers-reduced-motion: no-preference\) \{([\s\S]*?)\n\}/g;
+    const inside = [...source.matchAll(block)].map((m) => m[1]).join('\n');
+    expect(rule(inside, selector)).toMatch(/transform:/);
+    expect(rule(source.replace(block, ''), selector)).not.toMatch(/transform:/);
+  });
+
   it('al pulsar, tarjeta y botón vuelven a su sitio', () => {
     expect(rule(ui, '.card:active')).toMatch(/transform:\s*none/);
     expect(rule(ui, '.button:active:not(:disabled)')).toMatch(/transform:\s*none/);
