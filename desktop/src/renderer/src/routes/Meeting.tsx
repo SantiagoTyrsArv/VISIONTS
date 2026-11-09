@@ -1,3 +1,4 @@
+import { useIsPresent } from 'motion/react';
 import { useCallback, useEffect, useRef } from 'react';
 import { Navigate } from 'react-router';
 import { useShallow } from 'zustand/react/shallow';
@@ -27,6 +28,7 @@ export default function Meeting() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const { data: phrases } = usePhrases();
   const { exit } = useMeetingMode();
+  const isPresent = useIsPresent();
   const active = useMeeting((s) => s.active);
   const paused = useMeeting((s) => s.paused);
   const deviceMissing = useMeeting((s) => s.deviceMissing);
@@ -74,7 +76,7 @@ export default function Meeting() {
     togglePause();
   }, [togglePause]);
 
-  if (!active) return <Navigate to="/camara" replace />;
+  if (!active && isPresent) return <Navigate to="/camara" replace />;
 
   return (
     <main className={styles.meeting}>

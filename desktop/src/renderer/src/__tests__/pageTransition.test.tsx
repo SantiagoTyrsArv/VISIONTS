@@ -1,11 +1,18 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { PageTransition } from '@/ui/motion/PageTransition';
 import { MemoryRouter, useLocation } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AppRoutes } from '@/App';
 import { useSession } from '@/store/session';
+
+const motionFlags = vi.hoisted(() => ({ reduced: false }));
+vi.mock('motion/react', async (orig) => ({
+  ...(await orig<typeof import('motion/react')>()),
+  useReducedMotion: () => motionFlags.reduced,
+}));
 
 const speak = vi.fn();
 vi.mock('@/services/speech', () => ({
@@ -43,6 +50,7 @@ function renderAt(path: string) {
 
 beforeEach(() => {
   speak.mockReset();
+  motionFlags.reduced = false;
   useSession.setState({ status: 'authenticated', user: null });
 });
 
@@ -84,5 +92,42 @@ describe('transiciones entre pantallas', () => {
     await user.keyboard('3');
     await waitFor(() => expect(speak).toHaveBeenCalledTimes(1));
     expect(speak).toHaveBeenCalledWith(expect.objectContaining({ text: 'Tres' }));
+  });
+
+  it('al iniciar sesión, el acceso sigue en pantalla mientras se desvanece', async () => {
+    useSession.setState({ status: 'unauthenticated' });
+    renderAt('/login');
+    await screen.findByText('pantalla login');
+    act(() => useSession.setState({ status: 'authenticated' }));
+    // Justo después del cambio la pantalla saliente aún está: no se corta a vacío.
+    expect(screen.getByText('pantalla login')).toBeInTheDocument();
+    expect(await screen.findByText('pantalla camara')).toBeInTheDocument();
+    expect(screen.queryByText('pantalla login')).not.toBeInTheDocument();
+  });
+
+  it('al cerrar sesión, la pantalla saliente sigue en pantalla mientras se desvanece', async () => {
+    renderAt('/camara');
+    await screen.findByText('pantalla camara');
+    act(() => useSession.setState({ status: 'unauthenticated' }));
+    expect(screen.getByText('pantalla camara')).toBeInTheDocument();
+    expect(await screen.findByText('pantalla login')).toBeInTheDocument();
+  });
+});
+
+describe('PageTransition', () => {
+  it('dura 150 ms por tramo', () => {
+    const { container } = render(<PageTransition>x</PageTransition>);
+    expect(container.firstElementChild).toHaveAttribute('data-duration', '0.15');
+  });
+
+  it('con movimiento reducido cambia al instante', () => {
+    motionFlags.reduced = true;
+    const { container } = render(<PageTransition>x</PageTransition>);
+    expect(container.firstElementChild).toHaveAttribute('data-duration', '0');
+  });
+
+  it('instant (reunión) no anima', () => {
+    const { container } = render(<PageTransition instant>x</PageTransition>);
+    expect(container.firstElementChild).toHaveAttribute('data-duration', '0');
   });
 });

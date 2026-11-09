@@ -23,9 +23,10 @@ function routeGroup(pathname: string): string {
 
 export function AppRoutes() {
   const location = useLocation();
+  const group = routeGroup(location.pathname);
   return (
     <AnimatePresence mode="wait" initial={false}>
-      <PageTransition key={routeGroup(location.pathname)}>
+      <PageTransition key={group} instant={group === '/reunion'}>
         <Routes location={location}>
           <Route element={<RequireGuest />}>
             <Route path="/login" element={<Login />} />
