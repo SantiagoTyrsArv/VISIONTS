@@ -16,7 +16,11 @@ vi.mock('motion/react', async (orig) => ({
 
 const speak = vi.fn();
 vi.mock('@/services/speech', () => ({
-  speechService: { speak: (...a: unknown[]) => speak(...a), stop: vi.fn() },
+  speechService: {
+    speak: (...a: unknown[]) => speak(...a),
+    stop: vi.fn(),
+    warm: vi.fn(async () => undefined),
+  },
 }));
 vi.mock('@/api/endpoints', () => ({
   phrasesApi: {
@@ -27,8 +31,34 @@ vi.mock('@/api/endpoints', () => ({
     ],
   },
 }));
-// La cámara y los ajustes tienen sus propias pruebas: aquí solo importa la navegación.
-vi.mock('@/routes/Camera', () => ({ default: () => <h1>pantalla camara</h1> }));
+// La cámara y los ajustes tienen sus propias pruebas: aquí solo importa la navegación. La
+// cámara real solo se monta en la prueba de atajos (con la webcam y el reconocedor simulados).
+const realCamera = vi.hoisted(() => ({ on: false }));
+vi.mock('@/routes/Camera', async (orig) => {
+  const { default: Camera } = await orig<typeof import('@/routes/Camera')>();
+  return { default: () => (realCamera.on ? <Camera /> : <h1>pantalla camara</h1>) };
+});
+vi.mock('@/services/recognition/MediaPipeSignRecognizer', () => ({
+  MediaPipeSignRecognizer: class {
+    start = vi.fn();
+    stop = vi.fn();
+    onSign(): () => void {
+      return () => {};
+    }
+    onStatus(): () => void {
+      return () => {};
+    }
+    setClassifier = vi.fn();
+    onFrame(): () => void {
+      return () => {};
+    }
+  },
+}));
+vi.mock('@/services/camera/camera', async (orig) => ({
+  ...(await orig<typeof import('@/services/camera/camera')>()),
+  openCamera: async () => ({ getTracks: () => [] }),
+  listCameras: async () => [],
+}));
 vi.mock('@/routes/Settings', () => ({ default: () => <h1>pantalla ajustes</h1> }));
 vi.mock('@/routes/Login', () => ({ default: () => <h1>pantalla login</h1> }));
 
@@ -51,6 +81,8 @@ function renderAt(path: string) {
 beforeEach(() => {
   speak.mockReset();
   motionFlags.reduced = false;
+  realCamera.on = false;
+  vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
   useSession.setState({ status: 'authenticated', user: null });
 });
 
@@ -92,6 +124,22 @@ describe('transiciones entre pantallas', () => {
     await user.keyboard('3');
     await waitFor(() => expect(speak).toHaveBeenCalledTimes(1));
     expect(speak).toHaveBeenCalledWith(expect.objectContaining({ text: 'Tres' }));
+  });
+
+  it('de Frases a Señas, pulsar 3 justo después habla una sola vez', async () => {
+    realCamera.on = true;
+    const user = userEvent.setup();
+    renderAt('/frases');
+    const nav = await screen.findByRole('navigation');
+    await screen.findByRole('button', { name: 'Reproducir en voz alta: Tres' });
+    await user.click(within(nav).getByRole('link', { name: 'Señas' }));
+    await screen.findByRole('heading', { level: 1, name: 'Tus manos hablan' });
+    await user.keyboard('3');
+    await waitFor(() => expect(speak).toHaveBeenCalledTimes(1));
+    expect(speak).toHaveBeenCalledWith(expect.objectContaining({ text: 'Tres' }));
+    // Ni la pantalla saliente ni un segundo oyente repiten la frase.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(speak).toHaveBeenCalledTimes(1);
   });
 
   it('al iniciar sesión, el acceso sigue en pantalla mientras se desvanece', async () => {

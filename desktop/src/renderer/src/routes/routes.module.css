@@ -165,12 +165,6 @@
 .pill strong {
   color: var(--text);
 }
-.eyebrow {
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
 .field {
   display: flex;
   flex-direction: column;
@@ -179,79 +173,6 @@
 }
 
 /* ---------- Frases ---------- */
-.nowPlaying {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 20px;
-  padding: 20px 24px;
-  border-radius: var(--radius-l);
-  background: var(--accent);
-  color: var(--accent-text);
-}
-.nowPlayingText {
-  flex: 1 1 240px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.nowPlayingPhrase {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 30px;
-  line-height: 1.15;
-}
-.bars,
-.barsLive {
-  display: flex;
-  align-items: flex-end;
-  gap: 4px;
-  height: 32px;
-}
-.bars span,
-.barsLive span {
-  width: 5px;
-  border-radius: 3px;
-  background: var(--accent-text);
-  height: 12px;
-}
-.barsLive span {
-  animation: bar 0.9s ease-in-out infinite alternate;
-}
-.barsLive span:nth-child(2) {
-  animation-delay: -0.3s;
-}
-.barsLive span:nth-child(3) {
-  animation-delay: -0.6s;
-}
-.barsLive span:nth-child(4) {
-  animation-delay: -0.15s;
-}
-.barsLive span:nth-child(5) {
-  animation-delay: -0.45s;
-}
-@keyframes bar {
-  from {
-    height: 8px;
-  }
-  to {
-    height: 32px;
-  }
-}
-.stopBtn {
-  min-height: 44px;
-  padding: 0 18px;
-  border-radius: var(--radius-s);
-  border: 2px solid var(--accent-text);
-  background: transparent;
-  color: var(--accent-text);
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-.stopBtn:hover {
-  background: rgba(30, 20, 5, 0.08);
-}
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -307,20 +228,6 @@
   background: rgba(18, 19, 32, 0.88);
   font-size: 14px;
   font-weight: 700;
-}
-.signBanner {
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: 16px;
-  margin: 0;
-  padding: 14px 18px;
-  border-radius: var(--radius-m);
-  background: var(--accent);
-  color: var(--accent-text);
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 24px;
 }
 .cameraError {
   position: absolute;
@@ -418,6 +325,76 @@
 }
 .recentList li:first-child {
   font-weight: 700;
+  color: var(--text);
+}
+.recentList li {
+  color: var(--text-muted);
+}
+/* Punto «activo» (manos detectadas, cámara encendida): pulsa en menta. */
+@media (prefers-reduced-motion: no-preference) {
+  .dotPulse {
+    animation: livePulse 0.6s ease-in-out infinite alternate;
+  }
+}
+@keyframes livePulse {
+  from {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--live) 55%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--live) 15%, transparent);
+  }
+}
+.quick {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.quickHint {
+  margin-left: 8px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.quickRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.quickBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 16px 0 10px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    transform 0.15s;
+}
+.quickBtn:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+  transform: translateY(-2px);
+}
+.quickKey {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 8px;
+  display: inline-grid;
+  place-items: center;
+  background: var(--surface-raised);
+  color: var(--text-nav);
+  box-shadow: inset 0 -2px 0 var(--bg);
+  font-weight: 700;
+  font-size: 14px;
 }
 .muted {
   color: var(--text-muted);
@@ -603,11 +580,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .navLink {
+  .navLink,
+  .quickBtn {
     transition: none;
   }
-  .barsLive span {
-    animation: none;
-    height: 20px;
+  .quickBtn:hover {
+    transform: none;
   }
 }

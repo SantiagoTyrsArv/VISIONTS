@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, type RenderResult } from '@testing-library/react';
+import { act, render, screen, within, type RenderResult } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HashRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -41,7 +41,12 @@ vi.mock('@/services/recognition/MediaPipeSignRecognizer', () => ({
   },
 }));
 vi.mock('@/api/endpoints', () => ({
-  phrasesApi: { list: async () => [{ id: '1', code: 'hello', text_es: 'Hola', is_default: true }] },
+  phrasesApi: {
+    list: async () => [
+      { id: '1', code: 'hello', text_es: 'Hola', is_default: true },
+      { id: '2', code: 'thanks', text_es: 'Gracias', is_default: true },
+    ],
+  },
 }));
 const openCamera = vi.fn();
 vi.mock('@/services/camera/camera', async (orig) => ({
@@ -92,7 +97,6 @@ describe('pantalla de cámara', () => {
     });
 
     expect(speak).toHaveBeenCalledWith({ code: 'hello', text: 'Hola' });
-    expect(screen.getByText('Seña detectada: Hola')).toBeInTheDocument();
   });
 
   it('ignora códigos de seña que no pertenecen al catálogo', async () => {
@@ -105,7 +109,7 @@ describe('pantalla de cámara', () => {
     });
 
     expect(speak).not.toHaveBeenCalled();
-    expect(screen.queryByText(/Seña detectada/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Lo que has dicho' })).toBeNull();
   });
 
   it('cámara en uso → mensaje específico y reintento', async () => {
@@ -147,13 +151,56 @@ describe('pantalla de cámara', () => {
     expect(await screen.findByText('Modelo LSC · 1 señas')).toBeInTheDocument();
   });
 
-  it('las señas reconocidas aparecen en "Últimas señas"', async () => {
+  it('las señas reconocidas aparecen en «Lo que has dicho»', async () => {
     openCamera.mockResolvedValue(fakeStream);
     renderScreen();
     await recognizerStarted();
     await act(async () => {
       recognizerMock.emitSign({ code: 'hello', confidence: 0.9 });
     });
-    expect(screen.getByRole('list', { name: 'Últimas señas' })).toHaveTextContent('Hola');
+    expect(screen.getByRole('list', { name: 'Lo que has dicho' })).toHaveTextContent('Hola');
+  });
+
+  it('el título es «Tus manos hablan»', async () => {
+    openCamera.mockResolvedValue(fakeStream);
+    renderScreen();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Tus manos hablan');
+    await recognizerStarted();
+  });
+
+  it('la frase rápida «Hola» la dice y la añade a «Lo que has dicho»', async () => {
+    openCamera.mockResolvedValue(fakeStream);
+    renderScreen();
+    await recognizerStarted();
+    const hola = await screen.findByRole('button', { name: 'Reproducir en voz alta: Hola' });
+    expect(hola).toHaveAttribute('aria-keyshortcuts', '1');
+    await userEvent.click(hola);
+    expect(speak).toHaveBeenCalledWith({ code: 'hello', text: 'Hola' });
+    expect(screen.getByRole('list', { name: 'Lo que has dicho' })).toHaveTextContent('Hola');
+  });
+
+  it('la tecla 1 dice la primera frase y la añade a «Lo que has dicho»', async () => {
+    openCamera.mockResolvedValue(fakeStream);
+    renderScreen();
+    await recognizerStarted();
+    await screen.findByRole('button', { name: 'Reproducir en voz alta: Hola' });
+    await userEvent.keyboard('1');
+    expect(speak).toHaveBeenCalledWith({ code: 'hello', text: 'Hola' });
+    expect(screen.getByRole('list', { name: 'Lo que has dicho' })).toHaveTextContent('Hola');
+  });
+
+  it('«Lo que has dicho» guarda las 5 últimas, la más reciente arriba', async () => {
+    openCamera.mockResolvedValue(fakeStream);
+    renderScreen();
+    await recognizerStarted();
+    await screen.findByRole('button', { name: 'Reproducir en voz alta: Hola' });
+    await userEvent.keyboard('11111');
+    await userEvent.keyboard('2');
+    const items = within(screen.getByRole('list', { name: 'Lo que has dicho' })).getAllByRole(
+      'listitem',
+    );
+    expect(items).toHaveLength(5);
+    expect(items[0]).toHaveTextContent('Gracias');
+    expect(speak).toHaveBeenCalledTimes(6);
   });
 });

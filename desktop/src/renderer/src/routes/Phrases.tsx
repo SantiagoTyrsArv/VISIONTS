@@ -10,6 +10,7 @@ import { usePlayback } from '@/store/playback';
 import { signLabels, useSignModel } from '@/store/signModel';
 import { Button } from '@/ui/Button';
 import { IconSpeaker } from '@/ui/icons';
+import { NowSaying } from '@/ui/NowSaying';
 import { PhraseCard } from '@/ui/PhraseCard';
 
 import styles from './routes.module.css';
@@ -19,7 +20,6 @@ const speak = (p: Phrase) => void speechService.speak({ code: p.code, text: p.te
 export default function Phrases() {
   const { data, isPending, isError, refetch, isRefetching } = usePhrases();
   const lastText = usePlayback((s) => s.lastText);
-  const playing = usePlayback((s) => s.playing);
   const signs = useSignModel(useShallow(signLabels));
   usePhraseShortcuts(data, speak);
 
@@ -63,26 +63,7 @@ export default function Phrases() {
         </p>
       </header>
 
-      {lastText ? (
-        <section className={styles.nowPlaying} aria-live="polite">
-          <span className={playing ? styles.barsLive : styles.bars} aria-hidden>
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-          </span>
-          <div className={styles.nowPlayingText}>
-            <span className={styles.eyebrow}>
-              {t(playing ? 'home.nowPlaying' : 'home.lastSaid')}
-            </span>
-            <span className={styles.nowPlayingPhrase}>{lastText}</span>
-          </div>
-          <button type="button" className={styles.stopBtn} onClick={() => speechService.stop()}>
-            {t('home.stop')}
-          </button>
-        </section>
-      ) : null}
+      <NowSaying />
 
       {content}
     </div>
