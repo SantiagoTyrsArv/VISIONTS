@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
 
 import { queryClient } from '@/api/queryClient';
+import { useSignModelBoot } from '@/hooks/useSignModelBoot';
 import { AppLayout } from '@/routes/AppLayout';
 import Camera from '@/routes/Camera';
 import Login from '@/routes/Login';
@@ -54,6 +55,7 @@ export function App() {
   useEffect(() => {
     void useSession.getState().restore();
   }, []);
+  useSignModelBoot();
 
   return (
     <MotionConfig reducedMotion="user">

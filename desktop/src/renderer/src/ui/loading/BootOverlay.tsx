@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 import { PHRASES_KEY } from '@/api/usePhrases';
 import { useSession } from '@/store/session';
@@ -28,7 +28,7 @@ function usePhrasesState(): 'loading' | 'done' {
   });
 }
 
-/** Capa fija sobre el router: cubre el arranque y sale una sola vez. */
+/** Capa fija sobre el router: cubre el arranque y sale una sola vez. El modelo lo carga `useSignModelBoot`. */
 export function BootOverlay() {
   const session = useSession((s) => s.status);
   const model = useSignModel((s) => s.status);
@@ -38,7 +38,6 @@ export function BootOverlay() {
   const [booted, setBooted] = useState(false);
 
   const [capped, setCapped] = useState(false);
-  const modelRequested = useRef(false);
 
   useEffect(() => {
     const min = setTimeout(() => setMinElapsed(true), MIN_BOOT_MS);
@@ -48,14 +47,6 @@ export function BootOverlay() {
       clearTimeout(cap);
     };
   }, []);
-
-  // El modelo va empaquetado: se carga una vez con la sesión, aunque se arranque en /reunion
-  // (fuera de AppLayout).
-  useEffect(() => {
-    if (session !== 'authenticated' || modelRequested.current) return;
-    modelRequested.current = true;
-    void useSignModel.getState().load();
-  }, [session]);
 
   const { steps, finished, progress } = startupSteps({ session, model, phrases });
 

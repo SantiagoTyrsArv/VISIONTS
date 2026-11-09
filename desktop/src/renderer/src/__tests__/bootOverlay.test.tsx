@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PHRASES_KEY } from '@/api/usePhrases';
+import { useSignModelBoot } from '@/hooks/useSignModelBoot';
 import { useSession } from '@/store/session';
 import { useSignModel } from '@/store/signModel';
 import { BootOverlay, MAX_BOOT_MS, MIN_BOOT_MS } from '@/ui/loading/BootOverlay';
@@ -105,15 +106,29 @@ describe('BootOverlay', () => {
     await gone();
   });
 
+  it('la capa no carga el modelo por su cuenta', () => {
+    useSession.setState({ status: 'authenticated' });
+    const load = vi.fn(async () => undefined);
+    useSignModel.setState({ load });
+    mount();
+    advance(MIN_BOOT_MS);
+    expect(load).not.toHaveBeenCalled();
+  });
+
   it('con sesión guardada y arranque en /reunion el modelo se carga y la capa sale', async () => {
     useSession.setState({ status: 'authenticated' });
     client.setQueryData(PHRASES_KEY, []);
     const load = vi.fn(async () => useSignModel.setState({ status: 'ready' }));
     useSignModel.setState({ load });
+    // Como en App: el hook carga el modelo y la capa solo espera a que esté.
+    function Boot() {
+      useSignModelBoot();
+      return <BootOverlay />;
+    }
     render(
       <QueryClientProvider client={client}>
         <MemoryRouter initialEntries={['/reunion']}>
-          <BootOverlay />
+          <Boot />
         </MemoryRouter>
       </QueryClientProvider>,
     );
