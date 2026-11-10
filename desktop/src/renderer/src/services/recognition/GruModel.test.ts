@@ -25,6 +25,18 @@ describe('GruModel', () => {
     expect(prediction?.confidence).toBeCloseTo(fixture.probabilities[best], 4);
   });
 
+  it('lee la secuencia de un anillo rotado sin cambiar el resultado', () => {
+    const model = GruModel.fromJson(weights);
+    const slots = 31;
+    const first = 20; // el frame 0 de la ventana está en el hueco 20; el 11 vuelve al 0
+    const ring = new Float32Array(slots * 126).fill(99);
+    for (let t = 0; t < 30; t += 1) {
+      ring.set(fixture.input.slice(t * 126, (t + 1) * 126), ((first + t) % slots) * 126);
+    }
+    const probs = model.probabilitiesFrom(ring, first, slots);
+    probs.forEach((p, i) => expect(p).toBeCloseTo(fixture.probabilities[i], 4));
+  });
+
   it('devuelve null con una secuencia de longitud incorrecta', () => {
     expect(GruModel.fromJson(weights).predict([1, 2, 3])).toBeNull();
   });

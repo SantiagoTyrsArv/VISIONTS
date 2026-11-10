@@ -1,7 +1,7 @@
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { resolveAppPath } from '../appProtocol';
+import { resolveAppPath, withCrossOriginIsolation } from '../appProtocol';
 
 const root = resolve('/app/renderer');
 const exists = new Set([join(root, 'index.html'), join(root, 'assets', 'index-abc.js')]);
@@ -44,5 +44,20 @@ describe('resolveAppPath', () => {
 
   it('rechaza otro host', () => {
     expect(resolveAppPath(root, 'app://otro/index.html', fileExists)).toEqual({ kind: 'notFound' });
+  });
+});
+
+describe('withCrossOriginIsolation', () => {
+  it('añade COOP y COEP sin perder estado, cabeceras ni cuerpo', async () => {
+    const original = new Response('hola', {
+      status: 404,
+      headers: { 'Content-Type': 'text/plain' },
+    });
+    const res = withCrossOriginIsolation(original);
+    expect(res.status).toBe(404);
+    expect(res.headers.get('Content-Type')).toBe('text/plain');
+    expect(res.headers.get('Cross-Origin-Opener-Policy')).toBe('same-origin');
+    expect(res.headers.get('Cross-Origin-Embedder-Policy')).toBe('require-corp');
+    await expect(res.text()).resolves.toBe('hola');
   });
 });

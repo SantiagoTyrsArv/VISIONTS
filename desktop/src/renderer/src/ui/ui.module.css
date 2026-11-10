@@ -328,6 +328,77 @@
   margin: 0;
   color: var(--text-muted);
 }
+.diagnosticsBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.diagnosticsBlock:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+.diagnosticsSubtitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+.diagnosticsFacts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  font-variant-numeric: tabular-nums;
+}
+.diagnosticsFacts dt {
+  color: var(--text-muted);
+}
+.diagnosticsFacts dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.diagnosticsCode {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 13px;
+}
+.diagnosticsValue {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.diagnosticsSteps {
+  margin: 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.diagnosticsStep::marker {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* Lo que corre fuera del hilo principal se distingue con una barra a la izquierda. */
+.diagnosticsStep[data-kind='worker'] {
+  padding-left: 8px;
+  box-shadow: inset 2px 0 0 var(--live);
+}
+.diagnosticsMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.diagnosticsKind {
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--surface-raised);
+  color: var(--text);
+}
 
 /* Banda ámbar «Sonando ahora» (Frases y Cámara). */
 .nowSaying {

@@ -1,8 +1,7 @@
-import { HandLandmarker, type HandLandmarkerResult } from '@mediapipe/tasks-vision';
-import simdLoaderUrl from '@mediapipe/tasks-vision/vision_wasm_internal.js?url';
-import simdWasmUrl from '@mediapipe/tasks-vision/vision_wasm_internal.wasm?url';
-
-import { FRAME_INTERVAL_MS, LandmarkSequenceBuffer, type DetectedHand } from './landmarks';
+import { loopTrace } from './eventLoopTrace';
+import { frameScheduler, type FrameScheduler } from './frameScheduler';
+import { createDefaultLandmarker, toDetectedHands, type Landmarker } from './handLandmarker';
+import { FRAME_INTERVAL_MS, LandmarkSequenceBuffer } from './landmarks';
 import type { SignClassifier } from './SignClassifier';
 import type {
   RecognitionStatus,
@@ -11,47 +10,7 @@ import type {
   Unsubscribe,
 } from './SignRecognizer';
 
-export type Landmarker = Pick<HandLandmarker, 'detectForVideo' | 'close'>;
-type FrameCallback = (timestamp: number) => void;
-
-export type FrameScheduler = {
-  request(video: HTMLVideoElement, callback: FrameCallback): number;
-  cancel(video: HTMLVideoElement, id: number): void;
-};
-
-const frameScheduler: FrameScheduler = {
-  request(video, callback) {
-    if (video.requestVideoFrameCallback) {
-      return video.requestVideoFrameCallback((_now, metadata) =>
-        callback(metadata.mediaTime * 1000),
-      );
-    }
-    return requestAnimationFrame(callback);
-  },
-  cancel(video, id) {
-    if (video.cancelVideoFrameCallback) video.cancelVideoFrameCallback(id);
-    else cancelAnimationFrame(id);
-  },
-};
-
-// Solo se empaqueta el WASM con SIMD: cualquier PC con Windows 10/11 x64 lo admite.
-function createDefaultLandmarker(): Promise<Landmarker> {
-  const modelAssetPath = new URL('/models/hand_landmarker.task', window.location.href).toString();
-  return HandLandmarker.createFromOptions(
-    { wasmLoaderPath: simdLoaderUrl, wasmBinaryPath: simdWasmUrl },
-    { baseOptions: { modelAssetPath }, runningMode: 'VIDEO', numHands: 2 },
-  );
-}
-
-function toDetectedHands(result: HandLandmarkerResult): DetectedHand[] {
-  return result.landmarks.map((landmarks, index) => {
-    const category = result.handedness[index]?.[0]?.categoryName;
-    return {
-      landmarks,
-      ...(category === 'Left' || category === 'Right' ? { handedness: category } : {}),
-    };
-  });
-}
+export type { FrameScheduler, Landmarker };
 
 export type MediaPipeRecognizerOptions = {
   createLandmarker?: () => Promise<Landmarker>;
@@ -59,7 +18,10 @@ export type MediaPipeRecognizerOptions = {
   classifier?: SignClassifier | null;
 };
 
-/** Detección local de manos y clasificación de señas con el modelo empaquetado. */
+/**
+ * Todo en el hilo principal: MediaPipe y la GRU dentro de la task de cada frame. Es el modo
+ * «antes» con el que el panel Diagnóstico compara el INP de WorkerSignRecognizer.
+ */
 export class MediaPipeSignRecognizer implements SignRecognizer {
   private readonly createLandmarker: () => Promise<Landmarker>;
   private readonly scheduler: FrameScheduler;
@@ -96,6 +58,7 @@ export class MediaPipeSignRecognizer implements SignRecognizer {
     this.generation += 1;
     const generation = this.generation;
     this.sequence.clear();
+    this.classifier?.reset();
     this.previousTimestamp = -1;
     this.lastSampleAt = -Infinity;
     this.publishStatus({
@@ -134,6 +97,7 @@ export class MediaPipeSignRecognizer implements SignRecognizer {
     this.landmarker = null;
     landmarker?.close();
     this.sequence.clear();
+    this.classifier?.reset();
     this.lastSampleAt = -Infinity;
   }
 
@@ -151,6 +115,9 @@ export class MediaPipeSignRecognizer implements SignRecognizer {
   /** Cambia el modelo sin reiniciar la cámara (p. ej. al terminar un entrenamiento). */
   setClassifier(classifier: SignClassifier | null): void {
     this.classifier = classifier;
+    // El nuevo modelo tiene su propia ventana: se le pasan los frames ya reunidos.
+    classifier?.reset();
+    this.sequence.frames().forEach((frame) => classifier?.push(frame));
     this.publishStatus({ ...this.status, modelAvailable: !!classifier });
   }
 
@@ -164,6 +131,8 @@ export class MediaPipeSignRecognizer implements SignRecognizer {
   }
 
   private processFrame(timestamp: number): void {
+    // Inicio de la task de requestVideoFrameCallback (para la traza del event loop).
+    const frameStart = performance.now();
     const landmarker = this.landmarker;
     if (!this.running || !landmarker) return;
     if (
@@ -177,7 +146,9 @@ export class MediaPipeSignRecognizer implements SignRecognizer {
     try {
       const monotonicTimestamp = Math.max(Math.floor(timestamp), this.previousTimestamp + 1);
       this.previousTimestamp = monotonicTimestamp;
+      const detectStart = performance.now();
       const result = landmarker.detectForVideo(this.video, monotonicTimestamp);
+      const detectEnd = performance.now();
       const hands = toDetectedHands(result);
       const detected = hands.length > 0;
       if (detected !== this.handsDetected) {
@@ -192,7 +163,8 @@ export class MediaPipeSignRecognizer implements SignRecognizer {
       // La ventana se llena a ritmo fijo, no al de la cámara (ver FRAME_INTERVAL_MS).
       if (monotonicTimestamp - this.lastSampleAt < FRAME_INTERVAL_MS) return;
       this.lastSampleAt = monotonicTimestamp;
-      this.sequence.add(hands);
+      // El frame va a la ventana del modelo (en el worker: al SharedArrayBuffer).
+      this.classifier?.push(this.sequence.add(hands));
 
       if (
         !this.classifier ||
@@ -204,19 +176,29 @@ export class MediaPipeSignRecognizer implements SignRecognizer {
       }
       this.inferencePending = true;
       const generation = this.generation;
-      void this.classifier
-        .classify(this.sequence.toArray())
+      loopTrace.begin(frameStart);
+      loopTrace.mark('detectMain', 'sync', detectStart, detectEnd);
+      // classify() ejecuta la GRU de forma síncrona antes de su primer await.
+      const inferStart = performance.now();
+      const classifying = this.classifier.classify();
+      loopTrace.mark('inferMain', 'sync', inferStart, performance.now());
+      void classifying
         .then((sign) => {
+          // Microtask: corre en cuanto termina esta task del frame.
+          loopTrace.mark('then', 'microtask', performance.now());
+          loopTrace.end();
           if (sign && this.running && generation === this.generation) {
             this.signListeners.forEach((callback) => callback(sign));
           }
         })
         .catch(() => {
+          loopTrace.end();
           if (generation === this.generation) this.fail();
         })
         .finally(() => {
           if (generation === this.generation) this.inferencePending = false;
         });
+      loopTrace.mark('frame', 'task', frameStart, performance.now());
     } catch {
       this.fail();
     }

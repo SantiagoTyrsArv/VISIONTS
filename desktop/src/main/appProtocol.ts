@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs';
 import { isAbsolute, join, normalize, relative, resolve } from 'node:path';
 
+import { CROSS_ORIGIN_ISOLATION_HEADERS } from '../shared/crossOriginIsolation';
+
 export const APP_SCHEME = 'app';
 export const APP_HOST = 'senavoz';
 export const APP_ORIGIN = `${APP_SCHEME}://${APP_HOST}`;
@@ -38,4 +40,17 @@ export function resolveAppPath(
 
   if (rel !== '' && fileExists(candidate)) return { kind: 'file', path: candidate };
   return { kind: 'file', path: join(rootAbs, 'index.html') };
+}
+
+/** Copia la respuesta añadiendo COOP + COEP (las de net.fetch pueden ser inmutables). */
+export function withCrossOriginIsolation(response: Response): Response {
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(CROSS_ORIGIN_ISOLATION_HEADERS)) {
+    headers.set(name, value);
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }

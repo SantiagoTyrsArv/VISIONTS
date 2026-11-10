@@ -8,8 +8,11 @@ import {
   type CameraErrorKey,
 } from '@/services/camera/camera';
 import { MediaPipeSignRecognizer } from '@/services/recognition/MediaPipeSignRecognizer';
+import { getRecognitionThread } from '@/services/recognition/recognitionThread';
+import { WorkerSignRecognizer } from '@/services/recognition/WorkerSignRecognizer';
 import type { RecognitionStatus } from '@/services/recognition/SignRecognizer';
 import { useSettings } from '@/store/settings';
+import { useSignDiagnostics } from '@/store/signDiagnostics';
 import { signLabels, useSignModel } from '@/store/signModel';
 
 export type CamState =
@@ -34,6 +37,32 @@ export function modelStatusText(model: ModelView): string {
 }
 
 /**
+ * MediaPipe y la GRU van en un worker; en desarrollo, el panel Diagnóstico puede volver al
+ * hilo principal para comparar el INP. Sin Worker (jsdom) también se usa el hilo principal.
+ */
+function createRecognizer(
+  video: HTMLVideoElement,
+  model: {
+    classifier: ReturnType<typeof useSignModel.getState>['classifier'];
+    workerModel: ReturnType<typeof useSignModel.getState>['workerModel'];
+  },
+): MediaPipeSignRecognizer | WorkerSignRecognizer {
+  const diagnostics = useSignDiagnostics.getState();
+  if (typeof Worker === 'function' && getRecognitionThread() === 'worker') {
+    const recognizer = new WorkerSignRecognizer(video, {
+      model: model.workerModel,
+      ...(import.meta.env.DEV ? { onProbabilities: diagnostics.update } : {}),
+    });
+    diagnostics.setExecution(
+      recognizer.backpressure === 'shared' ? 'worker-shared' : 'worker-message',
+    );
+    return recognizer;
+  }
+  diagnostics.setExecution('main');
+  return new MediaPipeSignRecognizer(video, { classifier: model.classifier });
+}
+
+/**
  * Webcam + reconocedor de señas sobre un <video>. Lo usan la pantalla Cámara y la de
  * reunión; solo una está montada a la vez, así que hay una sola cámara abierta.
  */
@@ -55,19 +84,22 @@ export function useSignRecognition(
   });
 
   const classifier = useSignModel((s) => s.classifier);
-  const classifierRef = useRef(classifier);
-  const recognizerRef = useRef<MediaPipeSignRecognizer | null>(null);
+  const workerModel = useSignModel((s) => s.workerModel);
+  const modelRef = useRef({ classifier, workerModel });
+  const recognizerRef = useRef<MediaPipeSignRecognizer | WorkerSignRecognizer | null>(null);
 
   // El modelo termina de cargar después de abrir la cámara: se aplica sin reiniciarla.
   useEffect(() => {
-    classifierRef.current = classifier;
-    recognizerRef.current?.setClassifier(classifier);
-  }, [classifier]);
+    modelRef.current = { classifier, workerModel };
+    const recognizer = recognizerRef.current;
+    if (recognizer instanceof WorkerSignRecognizer) recognizer.setModel(workerModel);
+    else recognizer?.setClassifier(classifier);
+  }, [classifier, workerModel]);
 
   useEffect(() => {
     const videoElement = videoRef.current;
     let stream: MediaStream | null = null;
-    let recognizer: MediaPipeSignRecognizer | null = null;
+    let recognizer: MediaPipeSignRecognizer | WorkerSignRecognizer | null = null;
     let unsubscribeSign: (() => void) | null = null;
     let unsubscribeStatus: (() => void) | null = null;
     let cancelled = false;
@@ -86,9 +118,7 @@ export function useSignRecognition(
             // jsdom / autoplay: el vídeo arranca igualmente con autoPlay.
           }
           if (!cancelled) {
-            recognizer = new MediaPipeSignRecognizer(videoElement, {
-              classifier: classifierRef.current,
-            });
+            recognizer = createRecognizer(videoElement, modelRef.current);
             recognizerRef.current = recognizer;
             unsubscribeSign = recognizer.onSign(({ code }) => onSignRef.current(code));
             unsubscribeStatus = recognizer.onStatus((status) => setRecognition(status));

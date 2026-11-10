@@ -2,6 +2,8 @@ import { resolve } from 'node:path';
 import { defineConfig, loadEnv } from 'electron-vite';
 import react from '@vitejs/plugin-react';
 
+import { CROSS_ORIGIN_ISOLATION_HEADERS } from './src/shared/crossOriginIsolation';
+
 // Sin .env, index.html dejaría "%RENDERER_VITE_API_URL%" literal en la CSP y la
 // app empaquetada no podría hablar con la API. Mismo valor por defecto que config/env.ts.
 // (Las variables de process.env tienen prioridad sobre .env, así que solo se fija si falta en ambos.)
@@ -26,6 +28,11 @@ export default defineConfig(({ command, mode }) => {
         },
       },
       plugins: [react()],
+      // En desarrollo el renderer lo sirve Vite: mismas cabeceras que app:// en producción.
+      server: { headers: { ...CROSS_ORIGIN_ISOLATION_HEADERS } },
+      preview: { headers: { ...CROSS_ORIGIN_ISOLATION_HEADERS } },
+      // recognition.worker.ts se carga con { type: 'module' }.
+      worker: { format: 'es' },
     },
   };
 });
