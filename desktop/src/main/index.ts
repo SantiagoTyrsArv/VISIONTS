@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { IPC, type Tokens } from '../shared/ipc';
-import { APP_ORIGIN, APP_SCHEME, resolveAppPath } from './appProtocol';
+import { APP_ORIGIN, APP_SCHEME, resolveAppPath, withCrossOriginIsolation } from './appProtocol';
 import { createMeetingShortcuts } from './meetingShortcuts';
 import { createMeetingWindow, parseRect } from './meetingWindow';
 import { allowPermission, isTrustedOrigin } from './security';
@@ -140,10 +140,14 @@ function createWindow(): BrowserWindow {
 }
 
 app.whenReady().then(() => {
-  protocol.handle(APP_SCHEME, (request) => {
+  // Todas las respuestas llevan COOP + COEP (también la del worker, que las necesita para
+  // compartir memoria): el renderer queda en crossOriginIsolated.
+  protocol.handle(APP_SCHEME, async (request) => {
     const resolved = resolveAppPath(rendererRoot, request.url);
-    if (resolved.kind === 'notFound') return new Response('Not found', { status: 404 });
-    return net.fetch(pathToFileURL(resolved.path).toString());
+    if (resolved.kind === 'notFound') {
+      return withCrossOriginIsolation(new Response('Not found', { status: 404 }));
+    }
+    return withCrossOriginIsolation(await net.fetch(pathToFileURL(resolved.path).toString()));
   });
   applySecurity();
   registerIpc(createWindow());

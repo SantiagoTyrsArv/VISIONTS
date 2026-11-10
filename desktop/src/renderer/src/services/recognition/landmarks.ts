@@ -70,7 +70,8 @@ export class LandmarkSequenceBuffer {
     return this.window.length === SEQUENCE_LENGTH;
   }
 
-  add(hands: readonly DetectedHand[]): void {
+  /** Añade un frame y lo devuelve (126 valores, con las manos perdidas ya mantenidas). */
+  add(hands: readonly DetectedHand[]): number[] {
     const slots = assignHandSlots(hands);
     const frame = slots.map((slot, i) => {
       if (slot) {
@@ -86,12 +87,14 @@ export class LandmarkSequenceBuffer {
       this.last[i] = null;
       return zeroHand();
     });
-    this.window.push(frame.flat());
+    const values = frame.flat();
+    this.window.push(values);
     this.present.push(slots.some((s) => s !== null));
     if (this.window.length > SEQUENCE_LENGTH) {
       this.window.shift();
       this.present.shift();
     }
+    return values;
   }
 
   /** Si alguna mano real (no solo mantenida) aparece en la ventana. */

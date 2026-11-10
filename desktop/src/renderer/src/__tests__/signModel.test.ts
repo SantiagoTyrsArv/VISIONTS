@@ -19,10 +19,22 @@ function weights(labels: string[], bias: number[]) {
     metrics: { val_accuracy: 0.91, per_label: {} },
   };
 }
-const SEQ = Array<number>(3780).fill(0);
+const FRAME = Array<number>(126).fill(0);
+/** Llena la ventana de 30 frames y clasifica. */
+async function classifyWindow() {
+  const classifier = useSignModel.getState().classifier!;
+  for (let i = 0; i < 30; i += 1) classifier.push(FRAME);
+  return classifier.classify();
+}
 
 beforeEach(() =>
-  useSignModel.setState({ status: 'loading', classifier: null, labels: [], valAccuracy: null }),
+  useSignModel.setState({
+    status: 'loading',
+    classifier: null,
+    workerModel: null,
+    labels: [],
+    valAccuracy: null,
+  }),
 );
 
 describe('useSignModel (modelo empaquetado)', () => {
@@ -32,12 +44,12 @@ describe('useSignModel (modelo empaquetado)', () => {
     expect(s.status).toBe('ready');
     expect(s.valAccuracy).toBe(0.91);
     expect(signLabels(s)).toEqual(['hello']);
-    expect(await s.classifier!.classify(SEQ)).toMatchObject({ code: 'hello' });
+    expect(await classifyWindow()).toMatchObject({ code: 'hello' });
   });
 
   it('neutral nunca produce frase', async () => {
     await useSignModel.getState().load(async () => weights(['hello', 'neutral'], [0, 5]));
-    expect(await useSignModel.getState().classifier!.classify(SEQ)).toBeNull();
+    expect(await classifyWindow()).toBeNull();
   });
 
   it('un JSON inválido deja el estado en error sin clasificador', async () => {
@@ -58,5 +70,22 @@ describe('useSignModel (modelo empaquetado)', () => {
     expect(s.status).toBe('ready');
     expect(s.labels).toContain('neutral');
     expect(signLabels(s).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('prepara los pesos y la política para el worker', async () => {
+    const json = weights(['hello', 'neutral'], [5, 0]);
+    await useSignModel.getState().load(async () => json);
+    const { workerModel } = useSignModel.getState();
+    expect(workerModel?.weights).toBe(json);
+    const policy = workerModel!.policy;
+    expect(policy({ label: 'hello', confidence: 0.95 })).toMatchObject({ code: 'hello' });
+    // Cooldown: la misma seña sigue en la ventana y no se repite enseguida.
+    expect(policy({ label: 'hello', confidence: 0.95 })).toBeNull();
+    expect(policy({ label: 'neutral', confidence: 0.99 })).toBeNull();
+  });
+
+  it('un JSON inválido no deja pesos para el worker', async () => {
+    await useSignModel.getState().load(async () => ({ format: 'otro' }));
+    expect(useSignModel.getState().workerModel).toBeNull();
   });
 });

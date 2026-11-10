@@ -1,5 +1,5 @@
 import { SEQUENCE_LENGTH, VALUES_PER_FRAME } from './landmarks';
-import type { LandmarkModel, ModelPrediction } from './SignClassifier';
+import type { ModelPrediction } from '../../../../shared/recognitionProtocol';
 
 export const GRU_FORMAT = 'senavoz-gru-v1';
 
@@ -51,10 +51,17 @@ function affine(
   }
 }
 
+/** Etiqueta más probable. */
+export function bestOf(labels: readonly string[], probs: readonly number[]): ModelPrediction {
+  let best = 0;
+  for (let i = 1; i < probs.length; i += 1) if (probs[i] > probs[best]) best = i;
+  return { label: labels[best], confidence: probs[best] };
+}
+
 const sigmoid = (v: number): number => 1 / (1 + Math.exp(-v));
 
 /** GRU de una capa + capa lineal + softmax, en TypeScript puro (sin runtimes de ML). */
-export class GruModel implements LandmarkModel {
+export class GruModel {
   private constructor(
     readonly labels: readonly string[],
     private readonly hidden: number,
@@ -97,12 +104,21 @@ export class GruModel implements LandmarkModel {
 
   /** Probabilidades por etiqueta para una secuencia de 30 × 126 valores. */
   probabilities(sequence: readonly number[]): number[] {
+    return this.probabilitiesFrom(sequence, 0, SEQUENCE_LENGTH);
+  }
+
+  /**
+   * Igual que `probabilities`, pero leyendo los 30 frames de un anillo de `slots` huecos
+   * empezando en `firstSlot`, sin copiarlos (el anillo puede ser un SharedArrayBuffer).
+   */
+  probabilitiesFrom(frames: ArrayLike<number>, firstSlot: number, slots: number): number[] {
     const H = this.hidden;
     let h = new Float64Array(H);
     const gi = new Float64Array(3 * H);
     const gh = new Float64Array(3 * H);
     for (let t = 0; t < SEQUENCE_LENGTH; t += 1) {
-      affine(this.wih, sequence, t * VALUES_PER_FRAME, this.bih, gi);
+      const slot = (firstSlot + t) % slots;
+      affine(this.wih, frames, slot * VALUES_PER_FRAME, this.bih, gi);
       affine(this.whh, h, 0, this.bhh, gh);
       const next = new Float64Array(H);
       for (let j = 0; j < H; j += 1) {
@@ -123,9 +139,6 @@ export class GruModel implements LandmarkModel {
 
   predict(sequence: readonly number[]): ModelPrediction | null {
     if (sequence.length !== SEQUENCE_LENGTH * VALUES_PER_FRAME) return null;
-    const probs = this.probabilities(sequence);
-    let best = 0;
-    for (let i = 1; i < probs.length; i += 1) if (probs[i] > probs[best]) best = i;
-    return { label: this.labels[best], confidence: probs[best] };
+    return bestOf(this.labels, this.probabilities(sequence));
   }
 }

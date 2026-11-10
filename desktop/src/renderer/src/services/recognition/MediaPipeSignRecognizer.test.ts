@@ -63,6 +63,16 @@ function makeHarness(): Harness {
   return { video, landmarker, scheduler, advance };
 }
 
+/** Clasificador de prueba: registra los frames recibidos y delega `classify`. */
+function fakeClassifier(
+  classify: () => Promise<RecognizedSign | null> = vi.fn(async () => null),
+): SignClassifier & {
+  push: ReturnType<typeof vi.fn<(frame: readonly number[]) => void>>;
+  reset: ReturnType<typeof vi.fn<() => void>>;
+} {
+  return { push: vi.fn(), reset: vi.fn(), classify };
+}
+
 // Una mano degenerada (todo a 0) ya no cuenta como presente, de ahí los puntos distintos.
 const handPoints = () =>
   Array.from({ length: 21 }, (_, i) => ({
@@ -157,7 +167,7 @@ describe('MediaPipeSignRecognizer', () => {
 
   it('solo clasifica tras reunir 30 frames con manos', async () => {
     h.landmarker.detectForVideo.mockReturnValue(withHand());
-    const classifier: SignClassifier = { classify: vi.fn().mockResolvedValue(null) };
+    const classifier = fakeClassifier(vi.fn().mockResolvedValue(null));
     const recognizer = new MediaPipeSignRecognizer(h.video, {
       createLandmarker: async () => h.landmarker,
       scheduler: h.scheduler,
@@ -171,10 +181,9 @@ describe('MediaPipeSignRecognizer', () => {
     await Promise.resolve();
 
     expect(classifier.classify).toHaveBeenCalledTimes(1);
-    expect(classifier.classify).toHaveBeenCalledWith(expect.arrayContaining([expect.any(Number)]));
-    expect((classifier.classify as ReturnType<typeof vi.fn>).mock.calls[0][0]).toHaveLength(
-      SEQUENCE_LENGTH * 126,
-    );
+    // Cada muestra llega a la ventana del modelo como un frame de 126 valores.
+    expect(classifier.push).toHaveBeenCalledTimes(SEQUENCE_LENGTH);
+    classifier.push.mock.calls.forEach(([frame]) => expect(frame).toHaveLength(126));
   });
 
   it('no llena la ventana al ritmo de la cámara si va más rápida que FRAME_INTERVAL_MS', async () => {
@@ -183,7 +192,7 @@ describe('MediaPipeSignRecognizer', () => {
     const recognizer = new MediaPipeSignRecognizer(h.video, {
       createLandmarker: async () => h.landmarker,
       scheduler: h.scheduler,
-      classifier: { classify },
+      classifier: fakeClassifier(classify),
     });
     await recognizer.start();
     // Frames de cámara cada 1 ms: la ventana sigue muy lejos de tener 30 muestras.
@@ -198,7 +207,7 @@ describe('MediaPipeSignRecognizer', () => {
     const recognizer = new MediaPipeSignRecognizer(h.video, {
       createLandmarker: async () => h.landmarker,
       scheduler: h.scheduler,
-      classifier: { classify },
+      classifier: fakeClassifier(classify),
     });
     await recognizer.start();
     // Cada muestra va seguida de un frame de cámara 1 ms después, que debe ignorarse.
@@ -209,10 +218,6 @@ describe('MediaPipeSignRecognizer', () => {
     await Promise.resolve();
     expect(h.landmarker.detectForVideo).toHaveBeenCalledTimes(2 * SEQUENCE_LENGTH);
     expect(classify).toHaveBeenCalledTimes(1);
-    expect(classify.mock.calls[0] as unknown[]).toHaveLength(1);
-    expect((classify.mock.calls[0] as unknown as number[][])[0]).toHaveLength(
-      SEQUENCE_LENGTH * 126,
-    );
   });
 
   it('no clasifica si no hay manos en toda la ventana', async () => {
@@ -220,7 +225,7 @@ describe('MediaPipeSignRecognizer', () => {
     const recognizer = new MediaPipeSignRecognizer(h.video, {
       createLandmarker: async () => h.landmarker,
       scheduler: h.scheduler,
-      classifier: { classify },
+      classifier: fakeClassifier(classify),
     });
     await recognizer.start();
     for (let i = 0; i < SEQUENCE_LENGTH + 5; i += 1) h.advance(i * FRAME_INTERVAL_MS);
@@ -248,12 +253,12 @@ describe('MediaPipeSignRecognizer', () => {
 
   it('no emite una predicción atrasada después de detenerse', async () => {
     let resolvePrediction!: (value: RecognizedSign | null) => void;
-    const classifier: SignClassifier = {
-      classify: vi.fn(
+    const classifier = fakeClassifier(
+      vi.fn(
         (): Promise<RecognizedSign | null> =>
           new Promise((resolve) => (resolvePrediction = resolve)),
       ),
-    };
+    );
     const onSign = vi.fn();
     const recognizer = new MediaPipeSignRecognizer(h.video, {
       createLandmarker: async () => h.landmarker,
@@ -275,9 +280,7 @@ describe('MediaPipeSignRecognizer', () => {
 
   it('cambia de clasificador sin reiniciar la cámara y lo refleja en el estado', async () => {
     const onStatus = vi.fn();
-    const classifier: SignClassifier = {
-      classify: vi.fn().mockResolvedValue({ code: 'yes', confidence: 0.95 }),
-    };
+    const classifier = fakeClassifier(vi.fn().mockResolvedValue({ code: 'yes', confidence: 0.95 }));
     const onSign = vi.fn();
     const recognizer = new MediaPipeSignRecognizer(h.video, {
       createLandmarker: async () => h.landmarker,
@@ -304,5 +307,26 @@ describe('MediaPipeSignRecognizer', () => {
 
     recognizer.setClassifier(null);
     expect(onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ modelAvailable: false }));
+  });
+
+  it('al cambiar de clasificador le pasa los frames ya reunidos', async () => {
+    h.landmarker.detectForVideo.mockReturnValue(withHand());
+    const first = fakeClassifier();
+    const recognizer = new MediaPipeSignRecognizer(h.video, {
+      createLandmarker: async () => h.landmarker,
+      scheduler: h.scheduler,
+      classifier: first,
+    });
+    await recognizer.start();
+    expect(first.reset).toHaveBeenCalledTimes(1);
+    for (let i = 0; i < 5; i += 1) h.advance(i * FRAME_INTERVAL_MS);
+
+    const second = fakeClassifier();
+    recognizer.setClassifier(second);
+    expect(second.reset).toHaveBeenCalledTimes(1);
+    expect(second.push.mock.calls.map(([f]) => f)).toEqual(first.push.mock.calls.map(([f]) => f));
+
+    recognizer.stop();
+    expect(second.reset).toHaveBeenCalledTimes(2);
   });
 });
