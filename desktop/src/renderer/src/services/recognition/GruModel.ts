@@ -109,7 +109,7 @@ export class GruModel {
 
   /**
    * Igual que `probabilities`, pero leyendo los 30 frames de un anillo de `slots` huecos
-   * empezando en `firstSlot`, sin copiarlos (el anillo puede ser un SharedArrayBuffer).
+   * empezando en `firstSlot`, sin copiarlos (ver FrameRing en windowModels.ts).
    */
   probabilitiesFrom(frames: ArrayLike<number>, firstSlot: number, slots: number): number[] {
     const H = this.hidden;

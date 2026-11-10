@@ -163,7 +163,7 @@ export class MediaPipeSignRecognizer implements SignRecognizer {
       // La ventana se llena a ritmo fijo, no al de la cámara (ver FRAME_INTERVAL_MS).
       if (monotonicTimestamp - this.lastSampleAt < FRAME_INTERVAL_MS) return;
       this.lastSampleAt = monotonicTimestamp;
-      // El frame va a la ventana del modelo (en el worker: al SharedArrayBuffer).
+      // El frame va a la ventana del modelo.
       this.classifier?.push(this.sequence.add(hands));
 
       if (

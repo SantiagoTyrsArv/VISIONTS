@@ -1,6 +1,6 @@
 /**
  * COOP + COEP: con ambas, el renderer queda en crossOriginIsolated y puede usar
- * SharedArrayBuffer (anillo de landmarks entre el hilo principal y el worker).
+ * SharedArrayBuffer (el indicador «worker ocupado», que el hilo principal lee con Atomics).
  * COEP require-corp no rompe nada: fuentes, WASM y modelo son locales (mismo origen) y la
  * API se llama con CORS. Se aplican en app:// (main/index.ts) y en el servidor de desarrollo
  * (electron.vite.config.ts). Comprobación: `self.crossOriginIsolated === true`.
