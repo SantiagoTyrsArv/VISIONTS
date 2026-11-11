@@ -72,4 +72,11 @@ describe('tokenStore', () => {
     await expect(createTokenStore(deps).save(tokens)).rejects.toThrow(/cifrado/i);
     expect(files.size).toBe(0);
   });
+
+  it('save rechaza lo que no tenga forma de tokens y no escribe nada', async () => {
+    const store = createTokenStore(env.deps);
+    await expect(store.save({ accessToken: 'a1' } as never)).rejects.toThrow(/no válidos/i);
+    await expect(store.save(null as never)).rejects.toThrow(/no válidos/i);
+    expect(env.files.size).toBe(0);
+  });
 });

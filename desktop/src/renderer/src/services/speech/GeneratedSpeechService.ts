@@ -119,7 +119,12 @@ export class GeneratedSpeechService implements SpeechService {
     }
     events.onSpoken?.(text);
     events.onPlaying?.(true);
-    await audio.play();
+    try {
+      await audio.play();
+    } catch {
+      // No llegó a sonar. Si lo cortó una frase posterior (pause), esa ya lleva el estado.
+      if (this.audio === audio) events.onPlaying?.(false);
+    }
   }
 
   private stopAudio(): void {

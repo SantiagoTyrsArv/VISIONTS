@@ -1,7 +1,12 @@
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { resolveAppPath, withCrossOriginIsolation } from '../appProtocol';
+import {
+  resolveAppPath,
+  SCRIPT_CSP,
+  withCrossOriginIsolation,
+  withScriptCsp,
+} from '../appProtocol';
 
 const root = resolve('/app/renderer');
 const exists = new Set([join(root, 'index.html'), join(root, 'assets', 'index-abc.js')]);
@@ -59,5 +64,24 @@ describe('withCrossOriginIsolation', () => {
     expect(res.headers.get('Cross-Origin-Opener-Policy')).toBe('same-origin');
     expect(res.headers.get('Cross-Origin-Embedder-Policy')).toBe('require-corp');
     await expect(res.text()).resolves.toBe('hola');
+  });
+});
+
+describe('withScriptCsp', () => {
+  const root = resolve('/app/renderer');
+
+  it('los scripts (el worker entre ellos) llevan su CSP como cabecera', () => {
+    const res = withScriptCsp(new Response('x'), join(root, 'assets', 'recognition.worker-abc.js'));
+    expect(res.headers.get('Content-Security-Policy')).toBe(SCRIPT_CSP);
+  });
+
+  it('el worker solo puede conectar con la propia app', () => {
+    expect(SCRIPT_CSP).toContain("connect-src 'self'");
+    expect(SCRIPT_CSP).not.toMatch(/https?:/);
+  });
+
+  it('index.html no la lleva: su CSP (con la URL de la API) va en su <meta>', () => {
+    const res = withScriptCsp(new Response('x'), join(root, 'index.html'));
+    expect(res.headers.has('Content-Security-Policy')).toBe(false);
   });
 });

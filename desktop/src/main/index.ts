@@ -15,7 +15,13 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { IPC, type Tokens } from '../shared/ipc';
-import { APP_ORIGIN, APP_SCHEME, resolveAppPath, withCrossOriginIsolation } from './appProtocol';
+import {
+  APP_ORIGIN,
+  APP_SCHEME,
+  resolveAppPath,
+  withCrossOriginIsolation,
+  withScriptCsp,
+} from './appProtocol';
 import { createMeetingShortcuts } from './meetingShortcuts';
 import { createMeetingWindow, parseRect } from './meetingWindow';
 import { allowPermission, isTrustedOrigin } from './security';
@@ -139,7 +145,21 @@ function createWindow(): BrowserWindow {
   return win;
 }
 
+let mainWindow: BrowserWindow | null = null;
+
+// Una sola instancia: dos compartirían session.bin y, al refrescar una, la otra presentaría un
+// refresh token ya rotado; el servidor lo trata como robo y cierra todas las sesiones.
+const isFirstInstance = app.requestSingleInstanceLock();
+if (!isFirstInstance) app.quit();
+
+app.on('second-instance', () => {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.focus();
+});
+
 app.whenReady().then(() => {
+  if (!isFirstInstance) return;
   // Todas las respuestas llevan COOP + COEP (también la del worker, que las necesita para
   // compartir memoria): el renderer queda en crossOriginIsolated.
   protocol.handle(APP_SCHEME, async (request) => {
@@ -147,13 +167,12 @@ app.whenReady().then(() => {
     if (resolved.kind === 'notFound') {
       return withCrossOriginIsolation(new Response('Not found', { status: 404 }));
     }
-    return withCrossOriginIsolation(await net.fetch(pathToFileURL(resolved.path).toString()));
+    const file = await net.fetch(pathToFileURL(resolved.path).toString());
+    return withCrossOriginIsolation(withScriptCsp(file, resolved.path));
   });
   applySecurity();
-  registerIpc(createWindow());
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
+  mainWindow = createWindow();
+  registerIpc(mainWindow);
 });
 
 app.on('window-all-closed', () => {
