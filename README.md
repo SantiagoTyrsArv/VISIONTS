@@ -108,9 +108,10 @@ npm run build:win           # instalador en desktop/release/SenaVoz-Setup-<versi
 
 ### Uso
 
-1. Regístrate (entras directamente) o inicia sesión. La sesión se mantiene al cerrar y reabrir la app.
-2. **Frases**: haz clic en una tarjeta (o pulsa Enter/Espacio) y se reproduce en voz. **Atajos 1–9** para las nueve primeras frases; no se disparan mientras escribes ni con Ctrl/Alt.
-3. **Cámara**: vista de la webcam en espejo; MediaPipe detecta hasta dos manos y muestra su estado. La app empaqueta el runtime WASM y el modelo de detección, por lo que no necesita descargar esos archivos al iniciarse. Las frases marcadas con **Seña** se reconocen al hacerlas frente a la cámara y se dicen en voz; el panel muestra el estado del modelo y cuántas señas reconoce. En `npm run dev` (no en el instalador) aparece además un panel **Diagnóstico** con la probabilidad de cada clase y el umbral del 80 %, para ver por qué una seña no se reconoce. Si hay varias webcams aparece un selector; los errores de permiso y cámara mantienen su mensaje específico y opción "Reintentar".
+1. Al abrir, una pantalla de carga muestra los pasos reales del arranque (sesión, modelo de señas y frases). Regístrate (entras directamente) o inicia sesión. La sesión se mantiene al cerrar y reabrir la app.
+2. **Señas** (pantalla de inicio): vista de la webcam en espejo; MediaPipe detecta hasta dos manos y muestra su estado. La app empaqueta el runtime WASM y el modelo de detección, por lo que no necesita descargar esos archivos al iniciarse. Las frases marcadas con **Seña** se reconocen al hacerlas frente a la cámara y se dicen en voz. Sobre el vídeo aparece la frase que está sonando; al lado, **Lo que has dicho** (las 5 últimas), el **Estado** (cámara, manos y modelo, con cuántas señas reconoce) y las **Frases rápidas** (clic o teclas 1–9). Si hay varias webcams aparece un selector; los errores de permiso y cámara mantienen su mensaje específico y opción "Reintentar".
+   - En `npm run dev` (no en el instalador) aparece además un panel **Diagnóstico**: la probabilidad de cada clase frente al umbral del 80 % (para ver por qué una seña no se reconoce), la traza del último ciclo del event loop, las tareas largas del hilo principal, el INP y un selector para comparar el worker con «todo en el hilo principal».
+3. **Frases**: haz clic en una tarjeta (o pulsa Enter/Espacio) y se reproduce en voz. **Atajos 1–9** para las nueve primeras frases; no se disparan mientras escribes ni con Ctrl/Alt.
 4. **Ajustes**: sección **Reunión** (detección de VB-Cable, salida y prueba por el cable), voz de Windows (voces `es-*` instaladas), volumen, velocidad, cámara preferida (si se desenchufa, se usa la predeterminada), **Créditos** (atribución de LSC-54) y **Cerrar sesión**, que revoca el refresh token en el servidor.
 
 ### Usar SeñaVoz en una reunión
@@ -123,7 +124,7 @@ npm run build:win           # instalador en desktop/release/SenaVoz-Setup-<versi
 
 - Los tokens solo se guardan **cifrados con `safeStorage` (DPAPI de Windows)** en `%APPDATA%\SeñaVoz\session.bin`, desde el proceso main. Si el cifrado no está disponible, la sesión no se guarda (nunca en claro). Las preferencias no sensibles van a `localStorage`.
 - `contextIsolation` + `sandbox` activados y `nodeIntegration` desactivado. El preload expone `window.senavoz.tokens`, `tts` (voces, síntesis y poda de caché) y `meeting` (entrar, salir y atajos). Los textos a sintetizar llegan a PowerShell por stdin, nunca como argumentos.
-- La UI se sirve desde el protocolo propio `app://senavoz`, que solo entrega archivos de la carpeta de la UI. La CSP limita `connect-src` a la API.
+- La UI se sirve desde el protocolo propio `app://senavoz`, que solo entrega archivos de la carpeta de la UI. La CSP limita `connect-src` a la API; el worker de reconocimiento, donde corre MediaPipe, lleva la suya como cabecera y solo puede conectar con la propia app. Solo se abre una instancia: una segunda trae la primera al frente. Todas las respuestas llevan COOP + COEP (aislamiento de origen), que el worker de reconocimiento necesita para usar `SharedArrayBuffer`.
 - La app no envía vídeo ni landmarks a ningún servidor: el modelo va dentro de la app.
 - Solo se conceden a la propia app los permisos de cámara y de elección de salida de audio (`setSinkId`). La navegación externa y `window.open` están bloqueados.
 
@@ -143,11 +144,11 @@ npm run lint
 cd training && .venv\Scripts\python -m pytest
 ```
 
-Recuentos del 3/11/2026 (todos pasan):
+Recuentos del 10/11/2026 (todos pasan; 416 en total):
 
 - **Backend (30 tests):** registro, email duplicado, contraseñas débiles, login correcto e incorrecto (respuestas indistinguibles), límites por IP y por cuenta, `/users/me` con y sin token, refresh con rotación, detección de reutilización, refresh expirado, logout, frases y seed idempotente, `/samples` y `/models` eliminados (404), CORS de los orígenes de escritorio, `DATABASE_URL` de Neon y Render convertida a psycopg 3, y la migración `0004` sube y baja.
-- **Escritorio, main (46 tests):** almacén de tokens cifrado (incluidos archivo corrupto y cifrado no disponible), resolución de rutas de `app://` (path traversal, también codificado), orígenes y permisos de confianza, User-Agent ASCII y síntesis de voz por PowerShell.
-- **Escritorio, renderer (142 tests):** login, guard de rutas, sesión, cliente HTTP, voz, atajos, frases (distintivo "Seña"), ajustes, cámara, reunión y reconocimiento (normalización con paridad frente a `training/`, ventana temporal por intervalo y mano perdida, clasificación con umbral y pausa, ciclo de vida de MediaPipe, GRU en TypeScript con paridad frente a PyTorch, carga del modelo empaquetado y panel de diagnóstico).
+- **Escritorio, main (51 tests):** almacén de tokens cifrado (incluidos archivo corrupto, cifrado no disponible y tokens con forma inválida), resolución de rutas de `app://` (path traversal, también codificado), CSP del worker, orígenes y permisos de confianza, User-Agent ASCII, síntesis de voz por PowerShell, y ventana y atajos del Modo reunión.
+- **Escritorio, renderer (281 tests):** login, guard de rutas, sesión, cliente HTTP, voz, atajos, frases (distintivo "Seña"), ajustes, pantalla Señas, reunión, identidad visual (tema, logo, pantalla de carga y transiciones entre pantallas) y reconocimiento (normalización con paridad frente a `training/`, ventana temporal por intervalo y mano perdida, clasificación con umbral y pausa, ciclo de vida de MediaPipe, GRU en TypeScript con paridad frente a PyTorch, carga del modelo empaquetado, worker de reconocimiento con contrapresión, y panel de diagnóstico con traza del event loop, tareas largas e INP).
 - **Training (54 tests):** extracción con caché, carga de LSC-54, normalización, clase `neutral`, etiquetas frente al catálogo de frases, validación por persona sin fuga, aumentos, determinismo y exportación de `sign-model.json`.
 
 ## Qué se verificó y qué NO
@@ -181,6 +182,14 @@ Recuentos del 3/11/2026 (todos pasan):
 
 - Prueba manual del 3/11/2026 (`npm run dev` contra Docker local, webcam real, con el panel Diagnóstico): la app reconoce **"Buenos días"** y **"Buenas tardes"** hechas por una persona frente a la cámara, en la pantalla Cámara y en **Modo reunión** (la frase llega a la reunión). Es la primera prueba con una persona que no está en LSC-54. No hubo falsos positivos: con las manos quietas o bajadas no se dijo nada.
 
+- Revisión del 8/11/2026 (identidad visual «la mano que habla»): la app compilada se recorrió con Playwright sobre el Electron real y se corrigió lo que salió de esa revisión (commit `b1c3b9c`).
+
+- Medición del 9/11/2026 (reconocimiento en un Web Worker), con Playwright sobre el Electron real y cámara falsa alimentada por vídeos de LSC-54; 4 tandas alternas de 30 clics:
+  - con el worker, la respuesta a un clic (INP) tiene una mediana de 16–24 ms (máximo 32 ms) y no hay tareas largas en el hilo principal;
+  - con todo en el hilo principal, la mediana es de 64–96 ms (máximo 232 ms), con unas 250 tareas largas.
+
+- Revisión del 10/11/2026 (auditoría), con Playwright sobre el Electron compilado: la CSP del `<meta>` no llegaba al worker de reconocimiento (una petición externa desde él no generaba ninguna infracción). Con la cabecera nueva, la misma petición se bloquea por `connect-src` y MediaPipe sigue cargando dentro del worker. Una segunda instancia con el mismo perfil sale sola.
+
 **No verificado:**
 
 - La tasa de acierto con webcam real. Quien probó no sabe LSC, así que cuando una seña no se reconoció no se sabe si falló el modelo o la seña estaba mal hecha. Para medirla hace falta una persona que signe LSC, con otras cámaras e iluminación. Con vídeos de LSC-54 de personas no vistas, el acierto es 0,86 en "Buenos días" y 0,81 en "Buenas tardes".
@@ -190,15 +199,16 @@ Recuentos del 3/11/2026 (todos pasan):
 
 ## Decisiones de dependencias
 
-- **Electron + electron-vite + React/TypeScript**: reutiliza la lógica TS del MVP móvil (cliente con refresh, stores, i18n). `@mediapipe/tasks-vision` corre en el renderer sin código nativo; detección de manos local y clasificación con una GRU global (entrenada en `training/`) ejecutada en TypeScript puro, sin runtimes de ML. La voz se genera con las voces OneCore de Windows (WinRT vía PowerShell) y se envía con `setSinkId`.
+- **Electron + electron-vite + React/TypeScript**: reutiliza la lógica TS del MVP móvil (cliente con refresh, stores, i18n). `@mediapipe/tasks-vision` corre sin código nativo en un Web Worker del renderer, para no bloquear la interfaz; detección de manos local y clasificación con una GRU global (entrenada en `training/`) ejecutada en TypeScript puro, sin runtimes de ML. Cada frame viaja al worker como `ImageBitmap` transferido y, si el worker sigue ocupado, se descarta. La voz se genera con las voces OneCore de Windows (WinRT vía PowerShell) y se envía con `setSinkId`.
 - **Vite 7** (no 8) y **TypeScript 5.9**: son las versiones que admite electron-vite 5 y su tsconfig base.
 - **react-router** con `HashRouter` (funciona igual bajo `app://` y en desarrollo), **Zustand**, **TanStack Query**, **react-hook-form + zod 4**.
 - **Vitest** con dos proyectos (main en Node y renderer en jsdom). La lógica del main se escribe con dependencias inyectadas para testearla sin Electron.
 - **Web Speech API** solo como respaldo fuera del Modo reunión, porque no permite elegir el dispositivo de salida. La voz normal es audio pregenerado con OneCore y reproducido con `setSinkId`.
+- **`motion`** para las transiciones y el logo animado (respeta «reducir movimiento» de Windows), **`web-vitals`** para el INP del panel Diagnóstico y fuentes locales con **`@fontsource`** (Bricolage Grotesque y Atkinson Hyperlegible): la app no descarga nada al abrirse.
+- Las dependencias del renderer son `devDependencies`: Vite las empaqueta, así que no entran en el `app.asar`.
+- El **User-Agent se normaliza a ASCII** ("SenaVoz"), porque con la ñ del nombre Chromium rechazaba las subpeticiones de `app://` y la app empaquetada se quedaba en blanco.
+- Textos de UI centralizados en `desktop/src/renderer/src/i18n` (solo `es`).
 
 ## Datos y licencia
 
 El modelo de señas se entrena con **LSC-54**: Mora-Zarate, Garzón-Castro y Castellanos-Rivillas, *LSC-54: A landmark-based dataset for Colombian Sign Language*, Data in Brief 63 (2025) 112145. Dataset: <https://doi.org/10.57760/sciencedb.25639>, licencia **CC BY-NC 4.0** (uso no comercial, con atribución). El dataset no se versiona; la atribución también aparece en Ajustes › Créditos. Cómo descargarlo y entrenar: [training/README.md](training/README.md).
-- Las dependencias del renderer son `devDependencies`: Vite las empaqueta, así que no entran en el `app.asar`.
-- El **User-Agent se normaliza a ASCII** ("SenaVoz"), porque con la ñ del nombre Chromium rechazaba las subpeticiones de `app://` y la app empaquetada se quedaba en blanco.
-- Textos de UI centralizados en `desktop/src/renderer/src/i18n` (solo `es`).

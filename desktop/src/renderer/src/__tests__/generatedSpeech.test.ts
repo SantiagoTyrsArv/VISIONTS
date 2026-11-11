@@ -132,4 +132,16 @@ describe('GeneratedSpeechService', () => {
     expect(deps.fallback.stop).toHaveBeenCalled();
     expect(deps.events.onPlaying).toHaveBeenLastCalledWith(false);
   });
+
+  it('si el audio no llega a sonar, no falla y deja de marcarse como sonando', async () => {
+    const { svc, deps, audios } = setup();
+    const createAudio = deps.createAudio;
+    deps.createAudio = () => {
+      const audio = createAudio();
+      audios[audios.length - 1].play.mockRejectedValueOnce(new Error('NotSupportedError'));
+      return audio;
+    };
+    await expect(svc.speak('Hola')).resolves.toBeUndefined();
+    expect(deps.events.onPlaying).toHaveBeenLastCalledWith(false);
+  });
 });

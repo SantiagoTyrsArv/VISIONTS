@@ -1,0 +1,18 @@
+# Avisos y PR de actualización semanales. Python (backend/ y training/) no entra: sus locks con
+# hashes se generan con `uv pip compile` y Dependabot no sabe regenerarlos.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /desktop
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Un solo PR para parches y menores; las mayores llegan aparte para revisarlas una a una.
+      menores:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

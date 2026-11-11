@@ -42,6 +42,30 @@ export function resolveAppPath(
   return { kind: 'file', path: join(rootAbs, 'index.html') };
 }
 
+/**
+ * CSP de los scripts servidos por app://. Un worker no hereda la CSP del <meta> de index.html:
+ * toma la de la respuesta de su propio script, así que sin esta cabecera el worker de
+ * reconocimiento (donde corre MediaPipe) podría conectar con cualquier servidor. Solo necesita
+ * la propia app: el WASM, el modelo y el cargador que importa desde un blob (recognition.worker.ts).
+ */
+export const SCRIPT_CSP =
+  "default-src 'self'; script-src 'self' blob: 'wasm-unsafe-eval'; connect-src 'self'";
+
+/**
+ * Añade SCRIPT_CSP a todo lo que no sea un documento HTML. index.html conserva solo la CSP de
+ * su <meta>, que incluye la URL de la API; con dos políticas se aplicaría la intersección.
+ */
+export function withScriptCsp(response: Response, filePath: string): Response {
+  if (filePath.toLowerCase().endsWith('.html')) return response;
+  const headers = new Headers(response.headers);
+  headers.set('Content-Security-Policy', SCRIPT_CSP);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 /** Copia la respuesta añadiendo COOP + COEP (las de net.fetch pueden ser inmutables). */
 export function withCrossOriginIsolation(response: Response): Response {
   const headers = new Headers(response.headers);

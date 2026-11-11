@@ -40,6 +40,8 @@ export function createTokenStore({ filePath, safeStorage, fs }: TokenStoreDeps) 
     },
 
     async save(tokens: Tokens): Promise<void> {
+      // Llega por IPC: se valida la forma igual que al leer.
+      if (!isTokens(tokens)) throw new Error('Tokens no válidos');
       if (!safeStorage.isEncryptionAvailable()) {
         throw new Error('El cifrado del sistema no está disponible; no se guarda la sesión.');
       }
